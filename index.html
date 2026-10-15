@@ -1,0 +1,2807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#17151c">
+<title>Intervals</title>
+<!-- 0.19: installable web app (home screen icon, full screen, works offline) -- see sw.js -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Intervals">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<!--
+  Intervals 0.19 -- an interval ear-training app for singers. Plays a reference note on a real
+  piano sound and either asks you to SING an interval from it (the microphone listens and grades
+  the pitch you hold) or plays an interval and asks you to NAME it by tapping a button (no
+  microphone needed). One self-contained file (like Harmonizer); the only other file it needs
+  is intervals-piano-samples.json beside it (a copy of Harmonizer's Salamander Grand Piano set,
+  Alexander Holm, CC BY 3.0), and the page must be served over http(s) -- the microphone needs
+  a secure context: https://, or http://localhost. A plain http:// LAN address (an iPad testing
+  against the PC) will NOT get the mic, though Name-it mode still works there.
+
+  0.19 (2026-10-14):
+    - Installable web app. A web app manifest, icons and a service worker (sw.js, beside this
+      file) let Intervals be added to an iPhone or iPad home screen (Share › Add to Home Screen)
+      or installed from Chrome/Edge. It then opens full screen with its own icon, and once it has
+      been opened online it works with no connection -- the piano samples are cached too.
+    - "✓ offline ready" appears beside the version number once everything is cached on this device.
+    - New releases still go out the usual way (upload intervals-x.y.html, point current.txt at it);
+      an installed copy picks the new version up the next time it opens with a connection.
+    - Help: new "Install on your phone" section; Your progress notes that the home-screen app keeps
+      its own results, separate from the browser's.
+  0.18 (2026-09-28):
+    - Fix: in Intervals style the starting note now goes on the staff as it plays (Sing and Name
+      it), not only after grading -- the chip strip's clean-up was cancelling the timer that put it
+      there. Staff timers now run on their own.
+    - Settings › Display: "show a report when I stop a Sing session" (on by default) and "show my
+      progress" (on by default). Hiding progress hides the whole Your progress panel; results are
+      still recorded, and come back when it's switched on again (Reset is in that panel).
+  0.17 (2026-09-28):
+    - The staff now shows in Intervals style too, not just Solfège, in both Sing and Name it: the
+      starting note as it sounds, then (after grading) where you actually sang, and the target
+      beside it if you missed. No key signature; the two notes are spelled so the interval reads
+      correctly on the page (a 3rd three letters up, a 5th five: E♭ -> G, not E♭ -> F𝄪), choosing
+      C♯ or D♭ for the start so neither note needs a double sharp or flat. Labels under the notes
+      give the interval (P5↑, m3↓); in Name it the second note appears once you've answered.
+    - Session report: pressing Stop (or Esc) after singing opens "How close you were" -- one row
+      per question with a bar from 100 cents flat to 100 cents sharp, the counts-as-right band in
+      green, your first try as a solid dot and retries as hollow ones; a different note is named
+      in words. At the top: questions sung, right first time, average cents off, and whether you
+      lean sharp or flat. Works for Intervals and Solfège (mixed sessions too).
+    - A note repeated on the same letter with a different accidental (F♯ then F) now gets its
+      natural sign on the staff.
+  0.16 (2026-09-28):
+    - Microphone check: sing a held "ah" for a couple of seconds and Intervals measures how loudly
+      it hears you and sets the Boost to suit (up to a new ×32, for quiet voices and quiet mics).
+      If it hears nothing, or sound without a clear note, it says so and suggests what to try.
+      First visit: Welcome -> Settings (voice) -> Mic check. Anyone who hasn't done a check is
+      offered one the first time they press Start in Sing or Tuner. Also in Settings ("Check my
+      microphone") and beside the Boost menu.
+  0.15 (2026-09-28):
+    - Solfège: the key-setting cadence is now I–IV–V⁷–I (fa added to the V chord, resolving to mi,
+      with ti going up to do).
+    - Voice ranges are shown on a staff, not just as note names with octave numbers: each voice
+      button in Settings and in the Tuner's Vocal range menu has a small staff in that part's clef
+      (treble for soprano and alto, treble-8 for tenor, bass clef for baritone and bass) with its
+      lowest and highest notes; the chosen one is highlighted. The Tuner's Vocal range button shows
+      the current range, and the note you've picked to sing (cyan) between its limits.
+  0.14 (2026-09-28):
+    - Settings: the old Setup panel is now a Settings window, opened from the Settings button
+      in the header (the phone's Back button, Esc, × or Done close it). Voice is a row of buttons.
+    - Tuner: the octave − / + is gone. A "Vocal range" button (tap it for a menu of Soprano, Alto,
+      Tenor, Baritone, Bass) sets which notes are offered, and every note in that range gets its
+      own button, octave included. It starts as your voice in Settings each time you open the Tuner.
+    - First visit: a welcome note asks you to choose your voice part, and opens Settings when you
+      close it. (Add ?welcome to the address to see it again.)
+  0.13 (2026-09-27):
+    - Android hardening (and some iPhone benefit too):
+      * The screen is kept awake during a drill (Screen Wake Lock), so it doesn't dim and lock while
+        you're singing -- which, since 0.12, would stop the drill.
+      * Allows for output delay (Bluetooth headphones can add a quarter of a second or more): the
+        mic waits that much longer before it listens, and the chips light when you actually hear
+        each note, not when it was sent.
+      * A note when the microphone is a Bluetooth headset (call-quality sound on most phones).
+      * Clearer messages when the mic is refused (with Android steps) or busy in another app.
+      * The phone's Back button closes Help instead of leaving the page.
+      * Declares the page dark, so Chrome's and Samsung Internet's forced dark modes leave its
+        colours alone; the Android address bar matches the page.
+  0.12 (2026-09-27):
+    - Battery fix: 0.9's Silent Mode workaround made iOS treat the page as a media player (a
+      freezend.me Now Playing card with Pause/Play on the lock screen and Apple Watch) and never let
+      go, so a silent audio stream kept running in the background. Intervals now releases the audio
+      -- pauses the silent sound, returns the iOS audio session to normal, suspends the audio engine
+      and clears Now Playing -- when you press Stop and whenever the page goes into the background
+      (screen locked, another app, another tab). A drill that's running when the page is hidden is
+      stopped (mic off too); tap Start to carry on. Taps on the page no longer re-arm the
+      workaround unless a drill is running.
+  0.11 (2026-09-27):
+    - Sing · Solfège now shows the staff too: do and the starting note appear as they sound, and
+      once your note is graded it lands on the staff where you actually sang it -- green if right,
+      amber if not, with the target shown beside it (cyan) so you can see the gap. Hear answer
+      puts the target on the staff as it plays; Try again clears your note for a fresh attempt.
+  0.10 (2026-09-27):
+    - Name it · Solfège shows a staff beside the answer buttons: the clef for the chosen voice
+      (treble; treble-8 for tenor; bass for baritone and bass) and the key signature. do and the
+      starting note appear on it as they sound; the mystery note is added once you answer (green if
+      you got it, amber showing what it was if not). Accidentals appear only where the key
+      signature doesn't already cover them. Music glyphs come from an embedded ~2 KB subset of
+      Noto Music (SIL Open Font License), so the staff looks the same on every device.
+    - Sing and Tuner: under the sung note, a running average of how many cents off you are on the
+      note you're holding (sharp or flat), plus your average over this session's sung answers.
+  0.9 (2026-09-27):
+    - iPhone/iPad: sound now plays even when the device is in Silent Mode (ring/silent switch or
+      the Control Center bell). iOS mutes web audio in Silent Mode unless the microphone is on, so
+      Name it (no mic) was silent there while Sing (mic on) was not. The page now asks for the
+      "playback" audio session (navigator.audioSession, iOS 17+) -- "play-and-record" while the
+      mic is open -- and on older iOS plays a looping silent <audio> element, the standard trick
+      that moves the page into the playback category.
+  0.8 (2026-09-27):
+    - Solfège is now a switch (Intervals | Solfège) that works in both Sing and Name it, instead of
+      a separate mode. Header is back to Sing · Name it · Tuner.
+    - The key is set with a I–IV–V–I cadence (▶ Key / K plays it again). Each question then plays
+      do, clearly labelled, then the starting note, labelled -- and only then shows the syllable
+      to sing. A row of chips lights up as each sound plays, so you can see what you're hearing.
+    - Name it · Solfège: hear the key, do, the starting note and a mystery note; tap its syllable.
+    - Direction (↑ Up / ↓ Down / ↕ Both) moved out of Setup onto the drill panel, for both
+      Intervals and Solfège.
+  0.7 (2026-09-27):
+    - New Solfège mode: pick a key (do = C … B, movable do, major); Start plays do–mi–sol–do to set
+      the key, then gives you a note labelled by its syllable ("Reference: do (C4)") and asks for
+      the target by syllable, with the interval in brackets: "Sing fa (perfect 4th above)". Every
+      question stays in that key until you change it. The sung note, the trace and the results all
+      speak solfège; notes are spelled for the key (E♯ in F♯ major, not F). ▶ Key (or K) replays
+      the key; Setup can add the chromatic syllables di, me, fi, le, te and play the key before every
+      question. Stats gain a Solfège filter; the CSV gains key and syllable columns.
+  0.6 (2026-09-26):
+    - Help: a "?" button in the header (or the ? key) opens a Help window covering the three
+      modes, every Setup choice, the readout, progress, keyboard keys and troubleshooting.
+      Esc, the × button or a tap outside closes it.
+    - Grammar: "an octave" (not "a octave") wherever an interval name follows the article --
+      the Sing prompt, Name-it's "It was … not …" line, and the Sing "that was …" line.
+  0.5 (2026-09-26):
+    - A right answer flashes a big ✓ (a wrong one a ✗); going on by itself now waits a
+      setting-controlled pause (1, 2, 3 or 5 s, default 2) with a countdown bar you can see.
+    - Tuner: each held note is an "attempt" -- when you stop (or jump to another note) it shows
+      a summary for a few seconds: the note, how long, average cents off, how much it wavered,
+      and how much of it was in tune; the last eight attempts stay as chips below. The Tuner
+      ignores the mic while its own Play note is sounding.
+  0.4 (2026-09-26):
+    - Mic boost (×1 … ×16, next to the Mic bar, default ×4) so you can sing softly: a gain stage
+      before the pitch detector. Web Audio is floating-point, so boosting never clips; the pitch
+      detector's clarity score doesn't depend on loudness, only the "is anyone singing" gate does.
+  0.3 (2026-09-26):
+    - Stop button in every mode (Esc on a keyboard): silences the piano, ends the drill and
+      releases the microphone.
+    - Tuner: pick a target pitch (note buttons + octave) or leave it on "Any note"; Play sounds
+      it; the meter, the trace and a line of text show how far you are from it.
+    - iPad mic, second pass: the audio context is ALWAYS rebuilt once the mic is open (iPadOS
+      changes the hardware rate when recording starts, and a context made before that can get
+      garbled mic audio -- a level that moves but no pitch); pitch confidence threshold 0.88 -> 0.80;
+      optional "microphone details" readout (rate, level, pitch, clarity, dropouts) for diagnosis.
+  0.2 (2026-09-26):
+    - Touch-first: big on-screen buttons for everything; the keyboard hints only show on
+      devices with a real pointer. New "Name it" mode answers by tapping interval buttons.
+    - iPad/iPhone microphone fixes: the mic is opened before the piano is decoded and the audio
+      context is rebuilt if its sample rate doesn't match the mic's; the analyser is pulled
+      through a silent gain to the output (WebKit only processes nodes that reach it); a
+      suspended/"interrupted" context is resumed on the next tap; a watchdog notices a mic that
+      only delivers silence and offers "Restart mic"; quieter voices are accepted.
+    - Stats: every question is logged (kept in this browser), with this session / today /
+      all time views, trials, accuracy, streaks, average cents off, what each interval gets
+      mixed up with, a strip of recent results, and CSV export. 0.1's tallies are carried over.
+
+  Pitch detection is McLeod's Pitch Method (MPM, "A Smarter Way to Find Pitch", McLeod &
+  Wyvill 2005), written out below in about sixty lines -- a normalized square difference
+  function over one 2048-sample window, the first key maximum within 90% of the highest one,
+  parabolic interpolation, and the peak height kept as a "clarity" score so breaths,
+  consonants and noise can be ignored.
+-->
+<style>
+  /* Noto Music, subset to the clefs, accidentals and whole note -- SIL Open Font License 1.1 */
+  @font-face{font-family:'IvMusic';src:url(data:font/woff;base64,d09GRgABAAAAAAgcAA4AAAAACdgAAQABAAAAAAAAAAAAAAAAAAAAAAAAAABHREVGAAAHYAAAABQAAAAUAA8ACUdQT1MAAAd0AAAAYQAAAGzVgdePR1NVQgAAB9gAAABBAAAAQmEecCdPUy8yAAAFiAAAAFgAAABg0hZijmNtYXAAAAXgAAAAXwAAAJAAKf5OZ2FzcAAAB1gAAAAIAAAACAAAABBnbHlmAAABRAAAA5IAAARyPL1nlWhlYWQAAAUMAAAANgAAADYhC1f8aGhlYQAABWgAAAAeAAAAJAhkAeNobXR4AAAFRAAAACQAAAAkEPcB7mxvY2EAAAT4AAAAFAAAABQEPQVtbWF4cAAABNgAAAAdAAAAIAAyASRuYW1lAAAGQAAAAQEAAAHmJ/5AzHBvc3QAAAdEAAAAEwAAACD/nwAyeJxNU0tz21QUPpITXccP2bIsKbEty5FsyY/Ysq8syXYepHEdN5mCM4QYCCkJUCYMj5lSSqGUDgyTgRUTumDYMXSmw3RYw6rZpZuuyoIVw6LTRfobWDTlSm5KJB3dc8/jzj3fOR/QgJ/eh3/pXWAhDcBbnGNhUUgyCDEMch2HfHZT11QGYaVg5pp6rsdnw0oqHwqHU7G4wtC7x18UKqWck56NK2w3Yyb4HJuZkpLgna3BI+oIEITJ2ZxmI84SJBsJj5Sb05evUHNPHv9VoJMPDr+WvwI/foLiqSfkJgqAayPbtS3BFwH5Qk7whNiR8JZpKl2lQR6ymDe7tf3Ixei9g/jh3fA77H5kN3Lwe+LwILKr/8Dtwxjg48v0j+MOnIctuAF7AJSu203HXaAtLIleyQySHK96v3xRytKeTVP9sBEomiZa2MPD0HWDuAzP54G0EPBBYkmKyPt/ibxCEtVokuy4BsMQm5fsul6+rlEdNhGNRMtmYrIsJPUVS4slx+d32oPB+CTD0I11q7lWsxtlGxdDqVbvpWAoFKbV2vDlta1S6dprUrOeFdOTVS0ZXUzX5RQfjcZC+rymvVCUr3x09upqsiQpb8+s1gLT9nuOua4V+7WNysV2//svzTs03bvUffG6zN3IaikOD2aMXrW+OF/OO8bmMtcuFpvhEMa3tzcHg72NyJlXNtR8eWZlk3T/uMoYrjJlxyMMYgKBCdwvVtYW4z+9+cfrZy71gkyo/E2lX4YAYHiXPgrsQR3m4BzppYezXzcZJB8LC7vOCaqqh/Az5BEbQNQps3RKx7+eq69W8mfNhCFUanEUiqEo0utzpcby0se985/37XTv/V8+o69KuZx0Sq5/uGxe+3Zp9o1mMBi3pIngGE1XC/nmQmN2q7n0ycr2q9W19Z1Z+h6JVhSS8c+JAhSpBCiHYsAAsEZMEMgIjsZAI4pfi2MTxXORjSU8nErwqaHLcjwzP0zxsczQiop83KryosiZwwwXl4c2yyei7lBhuczQw+vpfeoWYWEK8lAjeJFhZAhZPDZK3GlSov8JOVI97e+glnHLck3PSSckNQSl6PgE/a0kT5bI+kFEFSsW/TOha5L69Dlp1XS3vD7tEfaOOY0zlpTwmQhB6k9qDGIgk9s8786IDxJ2nvXSG2rsXGi1dzqtC63WdudInZLrWVXKmN8VWjmlpRttJdvuYlXraFhVO/n/AAXvyGAAAHicY2BkYGDgZHjMoMhgz8DCAOIhADMDIwAf5gFXAAAAAAAAAAAuAEYAdAErAZABwwILAjkAAQAAAAIAxRALgRRfDzz1AA8D6AAAAADeOsrrAAAAAOC4R8H9h/07BW0GbQAAAAYAAgAAAAAAAAJYAF4BKwAyARQAMgFFADICxwAyAxcAMgFoADIB0wAyAgIAMnicY2BkYGDN/VcEJBv/tv99xprLABRBAZwAmu0GTQAAeJxjYGEyYpzAwMrAwNTFFMHAwOANoRnjGIwYnYCi3KxMLKwsTEwsQDkGJgYHBkYGCHD393dnOKCW+/8/a+6/IgYGtlymo0BhsDSTBNMpIKXAwAEAIXgMznicJYvRCYBADENT7hQRZxAR8UPX8NMVHEFcxsXu02lqmiu8NmlTABlAIguqPuhMPqGXz5h0y7FfH3f22/17lQMG9RO1mrhGjtpgZRTxb2UWkbGykZ265bwE0P3lXxFoAHicdZBNTgJBFIS/AYS4cWVcdwwLWCg4aiS6MixYgcYQF+wEZUYiM2Z+TLyJh+AEHIsTUDStIpG8VLpeTb163QNUGFDEK+0DX8KaexyqW/MCB8wcL9Ji7niJKgvH9+h7R46XOfYmtIl555OEVwJCMgw+TcEX60t50dmTKxMM93LGTKSOrPeWXGcoLSFVX7MZmTJTrmmoAiWvHDlDTjUVM5UaucSxEIml0qbypHKPqG9s7P6oD9oaqHvjSdt8pTVV59zQ4U7VEfue+5062Zr7L9lseR7VJfbb6nbmzy5j3zeWL7c5oVyR/Rc1PjiTsyVcCFfafcmzMNx40c6bLQEG1ErpAAAAeJxjYGYAg/9zGIwYsAAAKoMB0QAAAQAB//8ADwABAAAADAAAAAAAAAABAAgAAQABeJxjYGRgYOBisGHwYmBzcfMJYVBLrizKYVBLSS0zYlBLL0rNZlDLSSzJY1DLLS1OZlBjYAGqZ/j/nwGkjzG5tKiYgQPEAmMWBmYGTiDNAcRcYDEBIAnmM15g/ggAJH0QsQAAAHicY2BkYGDgYrBjcGBgc3HzCWFQS64symEwSEktM2IwSC9KzWYwyEksyWMwyC0tTmYwYGABqmf4/58BDgC0IQ0NAAAA) format('woff');font-display:block;}
+  :root{
+    --bg:#17151c; --bg-panel:#1f1c26; --bg-panel-2:#262230; --line:#37323f;
+    --text:#e9e6f0; --text-dim:#a79fb5; --violet:#9d7bff; --violet-dim:#6f57b8;
+    --cyan:#4fe0e6; --cyan-dim:#2c8b8f; --amber:#f0b459; --danger:#ef6a6a; --good:#6fdc8c;
+    --radius:8px;
+    --mono:"SF Mono","Cascadia Code",Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;}
+  button,select,input{font:inherit;color:inherit;}
+  button{background:var(--bg-panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer;
+    min-height:40px;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
+  button:hover:not(:disabled){border-color:var(--violet);}
+  button:active:not(:disabled){transform:translateY(1px);}
+  button:disabled{opacity:.4;cursor:default;}
+  button.accent{background:var(--violet-dim);border-color:var(--violet);}
+  button.big{font-size:17px;padding:12px 22px;min-height:50px;}
+  select{background:var(--bg-panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-height:36px;}
+  kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--text-dim);}
+
+  .app-header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 18px 10px 64px;border-bottom:1px solid var(--line);background:var(--bg-panel);}
+  .app-header h1{margin:0;font-size:20px;letter-spacing:.02em;}
+  .app-header .ver{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .app-header .offtag{font-family:var(--mono);font-size:11px;color:var(--good);opacity:.85;margin-left:-6px;}
+  .app-header .offtag[hidden]{display:none;}
+  .mode{margin-left:auto;display:flex;gap:4px;}
+  .mode button{padding:6px 14px;font-size:14px;}
+  .mode .helpbtn{padding:0;font-size:16px;margin-left:6px;}
+  .mode button.on{background:var(--violet-dim);border-color:var(--violet);}
+  #status{padding:6px 18px;font-size:13px;color:var(--text-dim);min-height:30px;border-bottom:1px solid var(--line);}
+  #status.warn{color:var(--amber);}
+  #status button{font-size:13px;padding:3px 10px;min-height:0;margin-left:6px;}
+
+  main{max-width:880px;margin:0 auto;padding:16px;}
+  .panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
+  details.panel summary{cursor:pointer;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:4px 0;}
+  .setup-grid{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;margin-top:12px;font-size:14px;}
+  .setup-grid > label{color:var(--text-dim);font-size:13px;}
+  .setup-grid .chk{color:var(--text);font-size:14px;display:flex;align-items:center;gap:6px;}
+  .ivals{display:flex;flex-wrap:wrap;gap:6px;}
+  .ivals label{display:flex;align-items:center;gap:5px;background:var(--bg-panel-2);border:1px solid var(--line);border-radius:16px;padding:5px 11px 5px 7px;font-size:14px;cursor:pointer;}
+  .ivals .quick{font-size:12.5px;padding:4px 10px;min-height:32px;}
+
+  .prompt{text-align:center;padding:10px 0 4px;}
+  .prompt .ask{font-size:28px;font-weight:600;margin:0;}
+  .prompt .ask em{font-style:normal;color:var(--cyan);}
+  .prompt .ref{margin-top:6px;color:var(--text-dim);font-size:14px;}
+  .prompt .ref b{color:var(--text);font-family:var(--mono);}
+  .buttons{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0 6px;}
+  .buttons button{min-width:120px;}
+  .hint{text-align:center;font-size:12px;color:var(--text-dim);}
+  @media (hover:none), (pointer:coarse){ .hint.keys{display:none;} }
+
+  .answers{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin:14px 0 4px;}
+  .answers button{min-height:62px;padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+  .answers button b{font-family:var(--mono);font-size:19px;}
+  .answers button span{font-size:12px;color:var(--text-dim);}
+  .answers button.right{background:rgba(111,220,140,.22);border-color:var(--good);}
+  .answers button.wrong{background:rgba(240,180,89,.20);border-color:var(--amber);}
+
+  .readout{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;}
+  .sung{text-align:center;}
+  .sung .note{font-family:var(--mono);font-size:44px;font-weight:600;line-height:1;}
+  .sung .hz{font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:4px;}
+  .meter{position:relative;height:46px;}
+  .meter .scale{position:absolute;left:0;right:0;top:18px;height:10px;border-radius:5px;background:var(--bg-panel-2);border:1px solid var(--line);}
+  .meter .band{position:absolute;top:18px;height:10px;background:rgba(111,220,140,.28);border-left:1px solid var(--good);border-right:1px solid var(--good);}
+  .meter .center{position:absolute;left:50%;top:12px;width:2px;height:22px;background:var(--good);margin-left:-1px;}
+  .meter .needle{position:absolute;top:8px;width:4px;height:30px;margin-left:-2px;border-radius:2px;background:var(--cyan);transition:left 60ms linear;left:50%;}
+  .meter .needle.off{opacity:.15;}
+  .meter .lab{position:absolute;top:34px;font-size:10.5px;color:var(--text-dim);font-family:var(--mono);transform:translateX(-50%);}
+  .meter .cap{position:absolute;top:0;left:0;right:0;text-align:center;font-size:12px;color:var(--text-dim);}
+  .levelrow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11.5px;color:var(--text-dim);}
+  .level{flex:1;height:5px;border-radius:3px;background:var(--bg-panel-2);overflow:hidden;}
+  .level i{display:block;height:100%;width:0;background:var(--cyan-dim);}
+  #micState{min-width:92px;text-align:right;}
+  .levelrow select{font-size:12px;padding:2px 4px;min-height:30px;}
+
+  canvas#trace{width:100%;height:220px;display:block;background:var(--bg-panel-2);border-radius:6px;margin-top:12px;}
+  .result{text-align:center;font-size:18px;min-height:30px;margin:12px 0 0;}
+  .result.ok{color:var(--good);} .result.bad{color:var(--amber);}
+  .result small{display:block;font-size:13px;color:var(--text-dim);margin-top:2px;}
+  .progress{height:3px;background:var(--bg-panel-2);border-radius:2px;margin-top:8px;overflow:hidden;}
+  .progress i{display:block;height:100%;width:0;background:var(--good);}
+
+  /* stats */
+  .row-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .row-head h2{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);}
+  .row-head .tools{margin-left:auto;display:flex;gap:6px;}
+  .row-head .tools button{font-size:12.5px;padding:4px 10px;min-height:32px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .seg button{border:0;border-radius:0;font-size:12.5px;padding:5px 11px;min-height:34px;background:var(--bg-panel-2);}
+  .seg button + button{border-left:1px solid var(--line);}
+  .seg button.on{background:var(--violet-dim);}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 10px;}
+  .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .tile{background:var(--bg-panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;text-align:center;}
+  .tile .v{font-family:var(--mono);font-size:22px;font-weight:600;}
+  .tile .k{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+  .tile .s{font-size:11px;color:var(--text-dim);}
+  .recent{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 2px;min-height:12px;}
+  .recent i{width:12px;height:12px;border-radius:50%;background:var(--amber);}
+  .recent i.ok{background:var(--good);}
+  .recent i.h{background:transparent;border:2px solid var(--text-dim);}
+  .foot{font-size:12px;color:var(--text-dim);margin-top:6px;}
+  table.stats{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px;}
+  table.stats th,table.stats td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;}
+  table.stats th:first-child,table.stats td:first-child{text-align:left;}
+  table.stats th{color:var(--text-dim);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+  table.stats td.mix{color:var(--text-dim);font-size:12.5px;}
+  .bar{display:inline-block;height:6px;border-radius:3px;background:var(--good);vertical-align:middle;}
+  .barbox{display:inline-block;width:70px;height:6px;border-radius:3px;background:var(--bg-panel-2);vertical-align:middle;margin-right:6px;overflow:hidden;}
+  .barbox .bar{display:block;height:100%;}
+
+  .tpick{margin:12px 0 4px;}
+  .tnotes{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;}
+  .tnotes button{min-height:48px;font-family:var(--mono);font-size:17px;padding:4px;}
+  .tnotes button.any{grid-column:span 2;font-family:var(--sans);font-size:14px;}
+  .tnotes button.on{background:var(--violet-dim);border-color:var(--violet);}
+  .tnotes button small{font-size:11px;color:var(--text-dim);margin-left:1px;}
+  .tnotes button.on small{color:var(--text);}
+  .tvoice{position:relative;display:flex;justify-content:center;margin-bottom:10px;}
+  .tvoice > button{font-size:14px;color:var(--text-dim);padding:6px 14px;}
+  .tvoice > button b{color:var(--text);font-weight:600;}
+  .tvoice > button .rng{font-family:var(--mono);font-size:12px;}
+  .tvoice > button .caret{font-size:11px;margin-left:4px;}
+  .tvmenu{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);z-index:50;min-width:230px;
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.55);padding:6px;display:flex;flex-direction:column;gap:4px;}
+  .tvmenu button{display:flex;justify-content:space-between;align-items:center;gap:14px;text-align:left;border-color:transparent;background:transparent;min-height:44px;}
+  .tvmenu button span{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+  .tvmenu button.on{background:var(--violet-dim);border-color:var(--violet);}
+  .tvmenu button.on span{color:var(--text);}
+  /* settings */
+  .setbtn{width:auto !important;border-radius:17px !important;padding:0 12px 0 10px !important;display:inline-flex;align-items:center;gap:6px;font-weight:500 !important;font-size:14px !important;}
+  .setbtn svg{width:16px;height:16px;flex:none;}
+  .voicepick{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;}
+  .voicepick button{min-height:52px;padding:4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+  .voicepick button small{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .voicepick button.on{background:var(--violet-dim);border-color:var(--violet);}
+  .voicepick button.on small{color:var(--text);}
+  .voicepick.pulse{animation:vpulse 1.6s ease-out 2;border-radius:8px;}
+  @keyframes vpulse{0%{box-shadow:0 0 0 0 rgba(157,123,255,.75);}100%{box-shadow:0 0 0 12px rgba(157,123,255,0);}}
+  svg.rstaff{display:block;width:100%;max-width:120px;height:auto;margin:2px auto 0;}
+  svg.rstaff .ln{stroke:#6d6680;stroke-width:1;}
+  svg.rstaff .mus{font-family:'IvMusic';fill:currentColor;}
+  svg.rstaff .clef8{font-family:var(--sans);font-size:7px;fill:var(--text-dim);}
+  svg.rstaff .tg .mus{fill:var(--cyan);}
+  svg.rstaff .rb{fill:rgba(157,123,255,.16);}
+  .on svg.rstaff .rb{fill:rgba(255,255,255,.14);}
+  .voicepick button{min-height:0;padding:6px 4px 5px;}
+  .tvoice > button#tvBtn{display:inline-flex;align-items:center;gap:10px;padding:4px 12px 4px 14px;text-align:left;}
+  .tvtxt{display:flex;flex-direction:column;line-height:1.3;}
+  .tvtxt small{font-family:var(--mono);font-size:11px;}
+  .tvstaff{width:118px;flex:none;color:var(--text);}
+  .tvstaff svg.rstaff{max-width:none;margin:0;}
+  .tvmenu{display:grid !important;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));width:min(600px,calc(100vw - 32px));}
+  .tvmenu.hidden{display:none !important;}
+  .tvmenu button{flex-direction:column;justify-content:flex-start;gap:0;text-align:center;padding:6px 4px;border-color:var(--line);background:var(--bg-panel-2);}
+  .tvmenu button em{font-style:normal;font-size:11px;color:var(--text-dim);}
+  .tvmenu button.on em{color:var(--text);}
+  .setwin{max-width:680px;}
+  .setwin .setup-grid{margin:14px 0 6px;}
+  .set-foot{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:var(--bg-panel-2);}
+  .set-foot button{min-width:110px;}
+  .welwin{max-width:470px;}
+  .mcwin .help-body{padding:8px 22px 14px;}
+  .mcrow{display:flex;align-items:center;gap:14px;margin:14px 0 6px;}
+  .mcrow .level{height:14px;border-radius:7px;}
+  .mcrow .level i{background:var(--cyan);transition:width 60ms linear;}
+  .mcnote{font-family:var(--mono);font-size:26px;font-weight:600;min-width:62px;text-align:center;}
+  .mcprog{height:6px;background:var(--bg-panel-2);border-radius:3px;overflow:hidden;margin:4px 0 8px;}
+  .mcprog i{display:block;height:100%;width:0;background:var(--good);transition:width 90ms linear;}
+  #mcMsg.ok{color:var(--good);} #mcMsg.bad{color:var(--amber);}
+  #mcMsg .big{font-size:18px;font-weight:600;}
+  .mcbtn{font-size:12px;padding:2px 9px;min-height:30px;}
+  .microw{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;}
+  .welwin .help-body{padding:4px 22px 12px;}
+  #stopBtn{border-color:var(--danger);}
+  .repwin{max-width:640px;}
+  .rtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 8px;}
+  .rtiles div{background:var(--bg-panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;}
+  .rtiles b{display:block;font-family:var(--mono);font-size:20px;}
+  .rtiles span{display:block;font-size:11.5px;color:var(--text-dim);line-height:1.3;}
+  .rrow{padding:7px 0 9px;border-bottom:1px solid var(--line);}
+  .rtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:14px;margin-bottom:5px;}
+  .rq{min-width:0;} .rn{display:inline-block;min-width:22px;font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .rres{text-align:right;font-family:var(--mono);font-size:13px;white-space:nowrap;}
+  .rres small{display:block;font-family:var(--sans);font-size:11px;color:var(--text-dim);}
+  .rok{color:var(--good);} .rbad{color:var(--amber);}
+  .rbar{position:relative;height:14px;margin:0 7px;background:var(--bg-panel-2);border-radius:7px;}
+  .rbar .rband{position:absolute;top:0;bottom:0;background:rgba(111,220,140,.22);}
+  .rbar .rmid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--text-dim);}
+  .rd{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;box-sizing:border-box;}
+  .rd.ok{background:var(--good);} .rd.bad{background:var(--amber);}
+  .rd.retry{background:none;border:2px solid;width:10px;height:10px;margin:-5px 0 0 -5px;}
+  .rd.retry.ok{border-color:var(--good);} .rd.retry.bad{border-color:var(--amber);}
+  .rd.far{box-shadow:0 0 0 2px var(--bg-panel),0 0 0 3.5px var(--amber);}
+  .rd.inl{position:relative;display:inline-block;top:1px;margin:0 2px;}
+  .rscale{border-bottom:0;padding-bottom:16px;} .rscale .rtop{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:0 7px 4px;}
+  .rscale .rbar{height:6px;background:none;} .rscale .rbar .rmid{top:-3px;bottom:-3px;}
+  .rscale em{position:absolute;top:9px;transform:translateX(-50%);font-style:normal;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+  .rkey{font-size:12.5px;margin-top:12px;}
+  @media (max-width:520px){ .rtiles{grid-template-columns:repeat(2,1fr);} .rtop{font-size:13px;} }
+  #diag{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:6px;white-space:pre-wrap;}
+  #drillPanel{position:relative;overflow:hidden;}
+  .flash{position:absolute;left:50%;top:42%;font-size:130px;font-weight:700;line-height:1;opacity:0;pointer-events:none;
+    transform:translate(-50%,-50%) scale(.6);text-shadow:0 0 30px rgba(0,0,0,.6);}
+  .flash.ok{color:var(--good);} .flash.bad{color:var(--amber);}
+  .flash.go{animation:pop 1.1s ease-out;}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.6);}18%{opacity:.95;transform:translate(-50%,-50%) scale(1.08);}
+    65%{opacity:.85;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(1);}}
+  #drillPanel.glow-ok{animation:glowok 1.1s ease-out;} #drillPanel.glow-bad{animation:glowbad 1.1s ease-out;}
+  @keyframes glowok{0%,40%{box-shadow:0 0 0 2px var(--good),0 0 24px rgba(111,220,140,.35);}100%{box-shadow:none;}}
+  @keyframes glowbad{0%,40%{box-shadow:0 0 0 2px var(--amber);}100%{box-shadow:none;}}
+  .countdown{height:4px;background:var(--bg-panel-2);border-radius:2px;margin-top:10px;overflow:hidden;}
+  .countdown i{display:block;height:100%;width:100%;background:var(--violet);}
+  .tsum{margin:12px auto 0;max-width:560px;text-align:center;background:var(--bg-panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:10px 14px;transition:opacity .8s;}
+  .tsum.ok{border-color:var(--good);} .tsum.bad{border-color:var(--amber);}
+  .tsum.fade{opacity:.35;}
+  .tsum .big{font-size:20px;font-weight:600;} .tsum.ok .big{color:var(--good);} .tsum.bad .big{color:var(--amber);}
+  .tsum .det{font-size:13px;color:var(--text-dim);margin-top:4px;}
+  .tsum.go{animation:tsumpop .5s ease-out;}
+  @keyframes tsumpop{0%{transform:scale(.94);opacity:.3;}100%{transform:scale(1);opacity:1;}}
+  .tchips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px;}
+  .tchips span{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:12px;border:1px solid var(--line);color:var(--text-dim);}
+  .tchips span.ok{border-color:var(--good);color:var(--good);}
+  .drillopts{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 6px;}
+  .keypick{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text-dim);}
+  .keypick select{font-size:15px;font-weight:600;min-width:118px;}
+  .keyscale{text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--text-dim);margin-bottom:4px;}
+  .seq{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px;min-height:0;margin:8px 0 2px;}
+  .seq:empty{display:none;}
+  .seq .chip{display:inline-flex;flex-direction:column;align-items:center;min-width:64px;padding:5px 10px 4px;border-radius:8px;
+    border:1px solid var(--line);background:var(--bg-panel-2);opacity:.35;transition:opacity .2s,border-color .2s,background .2s,transform .2s;}
+  .seq .chip b{font-size:19px;line-height:1.15;}
+  .seq .chip small{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .seq .chip.seen{opacity:1;}
+  .seq .chip.now{border-color:var(--violet);background:var(--violet-dim);transform:scale(1.06);}
+  .seq .chip.target{border-style:dashed;}
+  .seq .chip.target.seen{border-color:var(--cyan);border-style:solid;} .seq .chip.target.seen b{color:var(--cyan);}
+  .seq .arr{color:var(--text-dim);font-size:13px;}
+  .seq .sg{display:inline-flex;align-items:center;gap:6px;}
+  .prompt .ask .ivl{font-size:18px;font-weight:500;color:var(--text-dim);white-space:nowrap;}
+  .ansrow{display:flex;gap:14px;align-items:flex-start;}
+  .ansrow .answers{flex:1;min-width:0;}
+  .staffbox{flex:0 0 330px;margin-top:14px;background:var(--bg-panel-2);border:1px solid var(--line);border-radius:8px;padding:4px 6px 2px;}
+  .staffbox svg{display:block;width:100%;height:auto;}
+  .staffbox .cap{font-size:11px;color:var(--text-dim);text-align:center;margin-top:-2px;padding-bottom:4px;}
+  svg.staff .ln{stroke:#6d6680;stroke-width:1;}
+  svg.staff .mus{font-family:'IvMusic';fill:var(--text);}
+  svg.staff .clef8{font-family:var(--sans);font-size:10px;fill:var(--text-dim);}
+  svg.staff .lab{font-family:var(--sans);font-size:13px;font-weight:600;fill:var(--text);text-anchor:middle;}
+  svg.staff .nm{font-family:var(--mono);font-size:10px;fill:var(--text-dim);text-anchor:middle;}
+  svg.staff .n-start .mus, svg.staff .n-start .lab{fill:var(--violet);}
+  svg.staff .n-ok .mus, svg.staff .n-ok .lab{fill:var(--good);}
+  svg.staff .n-bad .mus, svg.staff .n-bad .lab{fill:var(--amber);}
+  svg.staff .n-target .mus, svg.staff .n-target .lab{fill:var(--cyan);}
+  .ansrow.solo{justify-content:center;}
+  svg.staff .n-ok .ln, svg.staff .n-bad .ln, svg.staff .n-start .ln, svg.staff .n-target .ln{stroke:#6d6680;}
+  .avgc{font-size:12px;color:var(--text-dim);margin-top:6px;min-height:16px;font-family:var(--mono);}
+  .avgc b{font-weight:600;} .avgc.ok b{color:var(--good);} .avgc.bad b{color:var(--amber);} .avgc.old{opacity:.55;}
+  .avgc .sess{display:block;font-size:11px;margin-top:2px;}
+  @media (max-width:700px){ .ansrow{flex-direction:column;align-items:stretch;} .staffbox{order:-1;flex:none;max-width:340px;width:100%;margin:12px auto 0;} }
+  /* help */
+  .helpbtn{min-height:34px;width:34px;padding:0;border-radius:50%;font-weight:700;font-size:16px;margin-left:6px;align-self:center;}
+  .help-back{position:fixed;inset:0;z-index:1000;background:rgba(8,6,12,.72);display:flex;align-items:center;justify-content:center;padding:18px;
+    opacity:0;transition:opacity .18s;}
+  .help-back.open{opacity:1;}
+  .help{background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.55);
+    width:100%;max-width:760px;max-height:100%;display:flex;flex-direction:column;overflow:hidden;
+    transform:translateY(10px) scale(.985);transition:transform .18s;}
+  .help-back.open .help{transform:none;}
+  .help-head{display:flex;align-items:center;gap:12px;padding:14px 16px 12px 20px;border-bottom:1px solid var(--line);background:var(--bg-panel-2);}
+  .help-head h2{margin:0;font-size:19px;}
+  .help-head .ver{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .help-head .x{margin-left:auto;width:40px;padding:0;font-size:22px;line-height:1;}
+  .help-toc{display:flex;flex-wrap:wrap;gap:6px;padding:10px 20px;border-bottom:1px solid var(--line);}
+  .help-toc a{font-size:12.5px;color:var(--text);text-decoration:none;background:var(--bg-panel-2);border:1px solid var(--line);border-radius:14px;padding:4px 11px;}
+  .help-toc a:hover{border-color:var(--violet);}
+  .help-body:focus{outline:none;}
+  .help-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 22px 22px;line-height:1.55;font-size:14.5px;}
+  .help-body h3{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--violet);margin:22px 0 6px;scroll-margin-top:10px;}
+  .help-body h4{font-size:15px;margin:14px 0 2px;color:var(--text);}
+  .help-body p{margin:6px 0;}
+  .help-body ul,.help-body ol{margin:6px 0;padding-left:22px;}
+  .help-body li{margin:3px 0;}
+  .help-body b{color:var(--text);}
+  .help-body .lede{font-size:15.5px;color:var(--text);margin-top:14px;}
+  .help-body .dim{color:var(--text-dim);}
+  .help-body .tip{background:var(--bg-panel-2);border-left:3px solid var(--cyan-dim);border-radius:0 6px 6px 0;padding:8px 12px;margin:10px 0;font-size:13.5px;}
+  .help-body dl{margin:6px 0;display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;}
+  .help-body dt{font-weight:600;white-space:nowrap;}
+  .help-body dd{margin:0;color:var(--text-dim);}
+  .help-body table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0;}
+  .help-body td,.help-body th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
+  .help-body th{color:var(--text-dim);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+  .help-body td:first-child{font-family:var(--mono);white-space:nowrap;}
+  .help-body .dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:4px;}
+  .help-body .credits{font-size:12.5px;color:var(--text-dim);border-top:1px solid var(--line);margin-top:22px;padding-top:12px;}
+  html.help-open, html.help-open body{overflow:hidden;}
+  .hidden{display:none !important;}
+  @media (max-width:640px){
+    .help-back{padding:0;} .help{border-radius:0;height:100%;border:0;} .help-body{padding:4px 16px 28px;}
+    .help-body dl{grid-template-columns:1fr;gap:0 0;} .help-body dd{margin-bottom:8px;}
+    .readout{grid-template-columns:1fr;} .prompt .ask{font-size:23px;} .app-header{padding-left:58px;}
+    .app-header{padding-right:10px;gap:8px 10px;} .mode{gap:3px;} .mode button{padding:6px 9px;font-size:13.5px;} .helpbtn{margin-left:2px;}
+    .prompt .ask .ivl{display:block;font-size:16px;margin-top:2px;}
+    .seq{gap:4px;} .seq .chip{min-width:0;padding:4px 7px 3px;} .seq .chip b{font-size:16px;} .seq .chip small{font-size:10px;} .seq .arr{font-size:11px;}
+    .tiles{grid-template-columns:repeat(3,1fr);}
+    table.stats .opt{display:none;}
+    .setbtn{width:34px !important;padding:0 !important;justify-content:center;border-radius:50% !important;} .setbtn .setlab{display:none;}
+    .setup-grid{grid-template-columns:1fr;gap:4px 0;} .setup-grid > label{margin-top:10px;}
+    .help-back.compact{padding:16px;} .help-back.compact .help{height:auto;border-radius:12px;border:1px solid var(--line);}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Intervals</h1><span class="ver" id="ver"></span><span class="offtag" id="offTag" hidden title="Saved on this device: Intervals will work with no connection">&#10003; offline ready</span>
+  <div class="mode">
+    <button type="button" id="modeSing" title="Sing the interval; the microphone grades it">Sing</button>
+    <button type="button" id="modeTap" title="Hear an interval and tap its name; no microphone needed">Name it</button>
+    <button type="button" id="modeTuner" title="Show your pitch against the nearest note">Tuner</button>
+    <button type="button" id="setBtn" class="helpbtn setbtn" title="Settings: your voice, intervals and more" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="10.5" cy="4" r="1.7" fill="var(--bg-panel-2)"/><circle cx="5.5" cy="8" r="1.7" fill="var(--bg-panel-2)"/><circle cx="9" cy="12" r="1.7" fill="var(--bg-panel-2)"/></svg><span class="setlab">Settings</span></button>
+    <button type="button" id="helpBtn" class="helpbtn" title="Help (?)" aria-label="Help" aria-haspopup="dialog">?</button>
+  </div>
+</header>
+<div id="status">&nbsp;</div>
+
+<main>
+  <section class="panel" id="drillPanel">
+    <div class="drillopts" id="drillOpts">
+      <div class="seg" id="styleSeg" title="Drill by interval name, or by solfège syllable in a key">
+        <button type="button" data-v="0">Intervals</button><button type="button" data-v="1">Solfège</button>
+      </div>
+      <div class="seg" id="dirSeg" title="Which way the intervals go">
+        <button type="button" data-v="up">↑ Up</button><button type="button" data-v="down">↓ Down</button><button type="button" data-v="both">↕ Both</button>
+      </div>
+      <span class="keypick hidden" id="keyRow"><label for="keySel">Key</label> <select id="keySel" title="The key everything is in: do is this note"></select></span>
+    </div>
+    <div class="keyscale hidden" id="keyScale"></div>
+    <div class="seq" id="seq" aria-live="polite"></div>
+    <div class="prompt">
+      <p class="ask" id="ask">Ready when you are</p>
+      <div class="ref" id="refLine">&nbsp;</div>
+    </div>
+    <div class="ansrow">
+      <div class="answers hidden" id="answers"></div>
+      <div class="staffbox hidden" id="staffBox" aria-hidden="true"></div>
+    </div>
+    <div class="tpick hidden" id="tunerPick">
+      <div class="tvoice">
+        <button type="button" id="tvBtn" aria-haspopup="menu" aria-expanded="false" title="Which notes to offer: the range of a voice part"><span class="tvtxt">Vocal range<span><b id="tvLab">Alto</b><span class="caret">▾</span></span><small class="rng" id="tvRange"></small></span><span class="tvstaff" id="tvStaff"></span></button>
+        <div class="tvmenu hidden" id="tvMenu" role="menu" aria-label="Vocal range"></div>
+      </div>
+      <div class="tnotes" id="tunerNotes"></div>
+    </div>
+    <div class="result" id="tapResult"></div>
+    <div class="buttons">
+      <button type="button" class="accent big" id="startBtn">Start</button>
+      <button type="button" class="big" id="keyBtn" title="Play the I–IV–V⁷–I cadence in this key (K)">▶ Key</button>
+      <button type="button" class="big" id="refBtn" disabled>▶ Reference</button>
+      <button type="button" class="big" id="answerBtn" disabled>Hear answer</button>
+      <button type="button" class="big" id="retryBtn" disabled>Try again</button>
+      <button type="button" class="accent big" id="nextBtn" disabled>Next →</button>
+      <button type="button" class="big" id="stopBtn">■ Stop</button>
+    </div>
+    <div class="hint keys" id="keyHint"></div>
+    <div class="countdown hidden" id="countdown" title="Next question coming"><i></i></div>
+    <div class="flash" id="flash"></div>
+  </section>
+
+  <section class="panel" id="readoutPanel">
+    <div class="readout">
+      <div class="sung">
+        <div class="note" id="sungNote">–</div>
+        <div class="hz" id="sungHz">&nbsp;</div>
+        <div class="avgc" id="avgCents"></div>
+      </div>
+      <div>
+        <div class="meter" id="meter">
+          <div class="cap" id="meterCap">cents from the target</div>
+          <div class="scale"></div>
+          <div class="band" id="band"></div>
+          <div class="center"></div>
+          <div class="needle off" id="needle"></div>
+          <span class="lab" style="left:0%">−100</span><span class="lab" style="left:25%">−50</span>
+          <span class="lab" style="left:50%">0</span><span class="lab" style="left:75%">+50</span><span class="lab" style="left:100%">+100</span>
+        </div>
+        <div class="levelrow"><span>Mic</span><div class="level"><i id="level"></i></div><span id="micState">off</span>
+          <label for="micGain" style="white-space:nowrap">Boost <select id="micGain">
+            <option value="1">×1</option><option value="2">×2</option><option value="4">×4</option><option value="8">×8</option><option value="16">×16</option><option value="32">×32</option>
+          </select></label><button type="button" class="mcbtn" id="mcOpen2" title="Let Intervals set the Boost for your voice">Check</button></div>
+        <div id="diag" class="hidden"></div>
+      </div>
+    </div>
+    <canvas id="trace" width="1600" height="440"></canvas>
+    <div class="progress" id="progressWrap"><i id="progress"></i></div>
+    <div class="result" id="result"></div>
+    <div class="tsum hidden" id="tunerSum"></div>
+    <div class="tchips hidden" id="tunerRecent"></div>
+  </section>
+
+  <section class="panel" id="statsPanel">
+    <div class="row-head">
+      <h2>Your progress</h2>
+      <div class="tools">
+        <button type="button" id="exportStats" title="Download every result as a spreadsheet file">Export CSV</button>
+        <button type="button" id="resetStats">Reset</button>
+      </div>
+    </div>
+    <div class="filters">
+      <div class="seg" id="scopeSeg">
+        <button type="button" data-v="session">This session</button><button type="button" data-v="today">Today</button><button type="button" data-v="all">All time</button>
+      </div>
+      <div class="seg" id="kindSeg">
+        <button type="button" data-v="all">All</button><button type="button" data-v="sing">Sung</button><button type="button" data-v="tap">Named</button><button type="button" data-v="solfa">Solfège</button>
+      </div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="recent" id="recent"></div>
+    <table class="stats" id="stats"></table>
+    <div class="foot" id="statsFoot"></div>
+  </section>
+</main>
+
+<div class="help-back hidden" id="setBack">
+  <div class="help setwin" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="help-head">
+      <h2 id="setTitle">Settings</h2>
+      <button type="button" class="x" id="setClose" aria-label="Close settings" title="Close (Esc)">×</button>
+    </div>
+    <div class="help-body" id="setBody" tabindex="0">
+      <div class="setup-grid">
+      <label>Voice</label>
+      <div class="voicepick" id="voice" role="radiogroup" aria-label="Voice"></div>
+      <label>Intervals</label>
+      <div class="ivals" id="ivals"></div>
+      <label for="tol">Singing counts as right</label>
+      <select id="tol">
+        <option value="15">within ±15 cents (strict)</option>
+        <option value="25" selected>within ±25 cents</option>
+        <option value="40">within ±40 cents (lenient)</option>
+      </select>
+      <label for="anyOct">Octave</label>
+      <label class="chk"><input type="checkbox" id="anyOct"> accept the right note sung in another octave</label>
+      <label for="hold">Hold for</label>
+      <select id="hold">
+        <option value="500">half a second</option>
+        <option value="800" selected>0.8 seconds</option>
+        <option value="1200">1.2 seconds</option>
+      </select>
+      <label for="play">Name it plays</label>
+      <select id="play">
+        <option value="melodic">the notes one after the other</option>
+        <option value="harmonic">both notes together</option>
+      </select>
+      <label for="autoNext">Next question</label>
+      <label class="chk"><input type="checkbox" id="autoNext"> go on by itself after a right answer, after
+        <select id="nextDelay"><option value="1000">1 second</option><option value="2000">2 seconds</option><option value="3000">3 seconds</option><option value="5000">5 seconds</option></select></label>
+      <label>Display</label>
+      <div>
+        <label class="chk"><input type="checkbox" id="report"> show a report of how close I was when I stop a Sing session</label>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" id="showStats"> show my progress (results are recorded either way)</label>
+      </div>
+      <label>Solfège</label>
+      <div>
+        <label class="chk"><input type="checkbox" id="solfaChrom"> include the chromatic syllables di, me, fi, le, te</label>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" id="keyEvery"> play the I–IV–V⁷–I cadence before every question, not just when the key changes</label>
+      </div>
+      <label>Microphone</label>
+      <div class="microw"><button type="button" id="mcOpen">Check my microphone</button><span class="dim" id="micGainNote"></span></div>
+      <label for="diagChk">Troubleshooting</label>
+      <label class="chk"><input type="checkbox" id="diagChk"> show microphone details under the Mic bar</label>
+      </div>
+      <p class="dim">Changes take effect at once and are remembered in this browser.</p>
+    </div>
+    <div class="set-foot"><button type="button" class="accent" id="setDone">Done</button></div>
+  </div>
+</div>
+
+<div class="help-back compact hidden" id="welBack">
+  <div class="help welwin" role="dialog" aria-modal="true" aria-labelledby="welTitle">
+    <div class="help-head"><h2 id="welTitle">Welcome to Intervals</h2></div>
+    <div class="help-body" id="welBody" tabindex="0">
+      <p class="lede">Two quick things before you start:</p>
+      <ol>
+        <li>Choose your <b>voice part</b> — Soprano, Alto, Tenor, Baritone or Bass — so every note Intervals plays, and every note it asks you to sing, sits in a comfortable range for you.</li>
+        <li>A <b>microphone check</b>: sing “ah” for a couple of seconds, and Intervals sets itself to hear you properly.</li>
+      </ol>
+      <p>You can change either any time with the Settings button at the top.</p>
+      <p class="dim">New to the app? The <b>?</b> button beside Settings explains everything.</p>
+    </div>
+    <div class="set-foot"><button type="button" class="accent" id="welOk">Choose my voice</button></div>
+  </div>
+</div>
+
+<div class="help-back compact hidden" id="micBack">
+  <div class="help welwin mcwin" role="dialog" aria-modal="true" aria-labelledby="micTitle">
+    <div class="help-head">
+      <h2 id="micTitle">Microphone check</h2>
+      <button type="button" class="x" id="mcClose" aria-label="Close" title="Close (Esc)">×</button>
+    </div>
+    <div class="help-body" id="micBody" tabindex="0">
+      <div id="mcMsg"></div>
+      <div class="mcrow"><span class="dim">Mic</span><div class="level"><i id="mcLevel"></i></div><div class="mcnote" id="mcNote">–</div></div>
+      <div class="mcprog" title="Fills while you hold a clear note"><i id="mcProg"></i></div>
+      <p class="dim" id="mcFoot" style="font-size:13px"></p>
+    </div>
+    <div class="set-foot"><button type="button" id="mcAlt">Skip</button><button type="button" class="accent" id="mcGo">Start</button></div>
+  </div>
+</div>
+
+<div class="help-back hidden" id="repBack">
+  <div class="help repwin" role="dialog" aria-modal="true" aria-labelledby="repTitle">
+    <div class="help-head">
+      <h2 id="repTitle">How close you were</h2><span class="ver" id="repSub"></span>
+      <button type="button" class="x" id="repClose" aria-label="Close" title="Close (Esc)">×</button>
+    </div>
+    <div class="help-body" id="repBody" tabindex="0"></div>
+    <div class="set-foot"><button type="button" class="accent" id="repDone">Done</button></div>
+  </div>
+</div>
+
+<div class="help-back hidden" id="helpBack">
+  <div class="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="help-head">
+      <h2 id="helpTitle">Intervals Help</h2><span class="ver" id="helpVer"></span>
+      <button type="button" class="x" id="helpClose" aria-label="Close help" title="Close (Esc)">×</button>
+    </div>
+    <nav class="help-toc" aria-label="Help sections">
+      <a href="#h-start">Getting started</a><a href="#h-sing">Sing</a><a href="#h-solfa">Solfège</a><a href="#h-name">Name it</a><a href="#h-tuner">Tuner</a>
+      <a href="#h-setup">Settings</a><a href="#h-readout">Reading the display</a><a href="#h-progress">Your progress</a>
+      <a href="#h-hooks">Memory hooks</a><a href="#h-install">Install on your phone</a><a href="#h-keys">Keyboard</a><a href="#h-trouble">Troubleshooting</a>
+    </nav>
+    <div class="help-body" id="helpBody" tabindex="0">
+      <p class="lede">Intervals is an ear-training tool for singers. It plays a note on a real grand piano and either asks you to
+        <b>sing</b> an interval from it — the microphone listens and tells you how close you got — or plays an interval and asks you to
+        <b>name</b> it. Both can be done by interval name or by <b>solfège</b> syllable in a key. A built-in <b>Tuner</b> shows you exactly where your pitch sits, note by note.</p>
+
+      <h3 id="h-start">Getting started</h3>
+      <ol>
+        <li>Pick a mode at the top right: <b>Sing</b>, <b>Name it</b> or <b>Tuner</b>. For Sing and Name it, choose <b>Intervals</b> or <b>Solfège</b>,
+          and which way the intervals go: <b>↑ Up</b>, <b>↓ Down</b> or <b>↕ Both</b>. You can change these any time; a fresh question starts right away.</li>
+        <li>Open <b>Settings</b> (the button at the top, beside <b>?</b>) and choose your voice part and the intervals you want to work on. (The defaults are a good place to begin.)</li>
+        <li>Press <b>Start</b>. In Sing and Tuner, your browser will ask to use the microphone — allow it. The first time, Intervals offers a quick
+          <b>microphone check</b> (see <i>Settings</i>) so it can hear you properly.</li>
+      </ol>
+      <div class="tip"><b>Headphones help a lot</b> in Sing mode. Through speakers, the microphone hears the piano as well as you.
+        Intervals waits for the piano to die away before it listens, but headphones make everything cleaner.</div>
+      <p><b>Name it</b> doesn’t use the microphone at all, so it works anywhere — on a train, in a library, or when the mic won’t cooperate.</p>
+
+      <h3 id="h-sing">Sing mode</h3>
+      <p>You hear a <b>reference</b> note, and the prompt tells you what to sing — for example <i>“Sing a major 3rd above.”</i>
+        Sing the note and <b>hold it steady</b>. The thin bar under the pitch trace fills as you hold; when it’s full, you’re graded.</p>
+      <ul>
+        <li>Intervals ignores the first moment of each note (the little scoop most of us make coming in), then takes the middle of what you held as your note.</li>
+        <li>A right answer flashes a green <b>✓</b>; a miss shows an amber <b>✗</b> and tells you what you sang — how many cents sharp or flat,
+          or, if you landed on a different note, which interval you actually sang.</li>
+      </ul>
+      <dl>
+        <dt>▶ Reference</dt><dd>Plays the starting note again.</dd>
+        <dt>Hear answer</dt><dd>Plays the reference and then the target. If you use it <i>before</i> you’ve sung, that question won’t count as right — it’s shown as a hollow dot in your progress.</dd>
+        <dt>Try again</dt><dd>Sing the same question once more. Only your first try counts toward accuracy, but getting it on a retry is noted.</dd>
+        <dt>Next →</dt><dd>A new question. After a right answer, Intervals can go on by itself (see <i>Next question</i> in Settings); a violet bar counts down the pause.</dd>
+        <dt>■ Stop</dt><dd>Silences the piano, ends the drill and turns the microphone off. If you sang anything, a <b>How close you were</b> report opens (see below).</dd>
+      </dl>
+      <h4>The staff</h4>
+      <p>Beside the prompt, a staff in your voice part’s clef shows the starting note as it sounds. Once you’re graded, your note lands where you actually sang it —
+        green if right, amber if not, with the target beside it in cyan so you can see the gap. In Intervals style there’s no key signature, and the two notes are
+        spelled so the interval reads as written (a 3rd three letters up, a 5th five). In <b>Name it</b>, the second note appears once you’ve answered.</p>
+      <h4>How close you were</h4>
+      <p>When you press <b>Stop</b> (or Esc) after a Sing session, a report (which you can turn off in Settings › Display) shows every question you sang:
+        what was asked, and a bar from 100 cents flat to 100 cents sharp with the green “counts as right” band. Your first try is a solid dot, retries are hollow rings.
+        If you landed on a different note altogether, the dot is pinned to the end with a ring and the note you sang is named on the right.
+        At the top: how many questions, how many were right first time, your average distance from the target, and whether you tend to sit sharp or flat.</p>
+
+      <h3 id="h-solfa">Solfège</h3>
+      <p>Above the prompt, switch <b>Intervals | Solfège</b>. Solfège works in both <b>Sing</b> and <b>Name it</b>, and drills the way a choir sight-reads:
+        in a major key, by syllable, with <b>movable do</b> — whatever key you choose, its first note is <b>do</b>, and the scale runs
+        <b>do re mi fa sol la ti do</b>.</p>
+      <p>Choose the <b>Key</b> from the menu beside the switch; the scale is spelled out underneath, so you can see where do is.
+        Every question stays in that key until you change it.</p>
+      <h4>What you hear</h4>
+      <p>A row of labelled chips lights up as each sound plays, so you always know what you’re hearing:</p>
+      <ol>
+        <li><b>I–IV–V⁷–I</b> — a cadence to set the key. It plays at the start and whenever you change key (or before every question, if you choose that in Settings).
+          <b>▶ Key</b> (or <kbd>K</kbd>) plays it again whenever you’ve lost the key.</li>
+        <li><b>do</b> — the do at or just below the starting note.</li>
+        <li><b>The starting note</b>, labelled with its syllable and marked <i>start</i> — for example <b>mi</b> · B3 · start. (If the start is do itself, you hear it once.)</li>
+      </ol>
+      <h4>Sing · Solfège</h4>
+      <p>Once do and the starting note have sounded, the prompt shows what to sing: <i>“Sing <b>sol</b> (perfect 4th above re)”</i>. Sing it and hold it, as in Sing mode.
+        The big readout shows the <b>syllable</b> you’re singing with the note name under it, and the pitch trace is labelled in syllables.
+        <b>▶ do + start</b> plays do and the starting note again; <b>Hear answer</b> plays the start and the target.</p>
+      <p>Under the prompt is a <b>staff</b> (see below for the clef): do and the starting note appear on it as they sound, and once your note is graded it lands where you <i>actually</i> sang it —
+        green if you hit the target, amber if not, with the target beside it in cyan so you can see how far off you were. <b>Hear answer</b> puts the target on the staff as it plays; <b>Try again</b> clears your note.</p>
+      <h4>Name it · Solfège</h4>
+      <p>After do and the starting note comes a mystery note (a <b>?</b> chip). Tap its <b>syllable</b>. The answer buttons are the scale in order, each with its note name for this key.
+        After answering, tap any syllable to hear it from the starting note and compare.</p>
+      <p>Beside the buttons is a <b>staff</b> (the same one Sing · Solfège shows) in the key you chose, with the clef for your voice (treble; treble with a little 8 below for tenor, which sounds an octave lower than written; bass clef for baritone and bass).
+        <b>do</b> and the starting note appear on it as they sound, and the mystery note joins them once you answer — green if you got it, amber if not.
+        Watching where the notes sit on the staff while you hear them is a good way to get to know a key: what fa looks like in E♭, how far sol is above do. (If Settings says <i>both notes together</i>, the start and the mystery note sound at once.)</p>
+      <p>The reference is always one of the seven scale notes. The target normally is too; tick <b>include the chromatic syllables</b> in Settings
+        and targets can also be <b>di</b> (raised do), <b>me</b>, <b>fi</b>, <b>le</b> or <b>te</b> (lowered mi, raised fa, lowered la, lowered ti).
+        Your choices of intervals, direction and voice apply here too.</p>
+      <div class="tip">Working on a piece in a minor key? Sing it with <b>la-based minor</b>: choose the relative major (for A minor, C major), and the minor tonic is <b>la</b>.</div>
+
+      <h3 id="h-name">Name it mode</h3>
+      <p>You hear two notes — one after the other, or both together, depending on Settings — and tap the button for the interval you heard.
+        Each button shows the short name (<b>m3</b>, <b>P5</b>…) and the full name underneath.</p>
+      <ul>
+        <li>The right answer lights up green. If you missed, your choice turns amber and the question is played again so you can listen.</li>
+        <li><b>After you’ve answered, tap any interval button</b> to hear that interval from the same starting note. It’s the quickest way to
+          learn the difference between two intervals you keep confusing.</li>
+        <li><b>▶ Play again</b> replays the question as many times as you like.</li>
+      </ul>
+
+      <h3 id="h-tuner">Tuner</h3>
+      <p>Sing any note and the Tuner shows which note you’re on and how many cents sharp or flat you are. To aim for a particular pitch,
+        tap one of the note buttons; <b>▶ Play</b> sounds it on the piano (the Tuner doesn’t listen while the piano is playing).</p>
+      <p>The buttons cover one voice part’s range, octave included (for Alto, G3 up to C5). The <b>Vocal range</b> button shows the range on a staff, with the note you’ve picked in cyan. Tap it to choose
+        Soprano, Alto, Tenor, Baritone or Bass. It starts as your voice in Settings each time you open the Tuner, so you can borrow another part’s range
+        for a while (to stretch your top, say) without changing your voice for the drills.</p>
+      <p>Each note you hold is an <b>attempt</b>. When you stop singing, or move to another note, you get a summary: the note, how long you held it,
+        how sharp or flat you were on average, how much the pitch wavered, and what share of the time you were in tune.
+        Your last eight attempts stay below as small chips — green ones were in tune.</p>
+      <div class="tip">Good exercise: pick a note, hold it for five seconds, and watch the “wavered” number come down as your support steadies.</div>
+
+      <h3 id="h-setup">Settings</h3>
+      <p>Tap <b>Settings</b> at the top. Changes take effect straight away; <b>Done</b>, <b>×</b>, <kbd>Esc</kbd> or a tap outside closes the window.</p>
+      <dl>
+        <dt>Voice</dt><dd>Keeps both the reference and the answer inside a comfortable range for Soprano, Alto, Tenor, Baritone or Bass
+          (each button shows its range on a staff in that part’s clef: treble for soprano and alto, treble with a little 8 below for tenor, bass clef for baritone and bass). It also sets the clef on the staff, and the Tuner’s starting range.</dd>
+        <dt>Intervals</dt><dd>Tick the ones to practise (the direction — up, down or both — is chosen on the main panel). <b>All</b>, <b>Consonant</b> and <b>Steps</b> are quick presets. Starting with a few and adding more as they become easy works well.</dd>
+        <dt>Singing counts as right</dt><dd>How close is close enough: ±15 cents is strict, ±25 is the default, ±40 is lenient.</dd>
+        <dt>Octave</dt><dd>Accept the right note sung in a different octave — useful for low voices answering a high reference, or high voices a low one.</dd>
+        <dt>Hold for</dt><dd>How long you must hold the note before it’s graded.</dd>
+        <dt>Name it plays</dt><dd>The two notes one after the other (melodic) or together (harmonic). Harmonic is harder — try it once melodic is solid.</dd>
+        <dt>Next question</dt><dd>Go on by itself after a right answer, after a 1-, 2-, 3- or 5-second pause.</dd>
+        <dt>Display</dt><dd>Turn off the <b>How close you were</b> report at the end of a Sing session, and/or hide <b>Your progress</b>.
+          Results are still recorded while it’s hidden — switch it back on to see them, or to use Reset.</dd>
+        <dt>Solfège</dt><dd>Add the chromatic syllables (di, me, fi, le, te), and/or play the I–IV–V⁷–I cadence before every question instead of only at the start and when the key changes.</dd>
+        <dt>Microphone</dt><dd><b>Check my microphone</b>: sing “ah” at your normal practice volume for a couple of seconds and Intervals sets the <b>Boost</b> to suit your voice and your device.
+          Do it again if you change device, headphones or room — or if it keeps saying <i>too quiet</i>. (The <b>Check</b> button beside Boost does the same.)</dd>
+        <dt>Troubleshooting</dt><dd>Shows technical microphone details under the Mic bar; handy if something isn’t working.</dd>
+      </dl>
+      <p class="dim">Your settings are remembered in this browser.</p>
+
+      <h3 id="h-readout">Reading the display</h3>
+      <dl>
+        <dt>Big note</dt><dd>The note you’re singing right now, with its frequency in hertz.</dd>
+        <dt>avg</dt><dd>Under it, the running average of how far off you are on the note you’re holding — how many cents sharp or flat — so you can see whether you tend to sit high or low.
+          It stays (dimmed) after you stop. The <i>session</i> line averages all your sung answers since you opened the page.</dd>
+        <dt>Meter</dt><dd>How far you are from the target, from −100 to +100 cents. The green band is the “counts as right” zone.</dd>
+        <dt>Trace</dt><dd>The last six seconds of your pitch. In Sing mode the dashed violet line is the reference and the green line and band are the target;
+          your line turns green while you’re in the zone.</dd>
+        <dt>Mic bar</dt><dd>How loud the microphone hears you. Next to it: <i>hearing you</i> (a clear pitch), <i>listening</i> (sound, but no clear pitch yet),
+          <i>too quiet</i>, <i>silent</i> or <i>off</i>.</dd>
+        <dt>Boost</dt><dd>Turns up the microphone so you can sing softly. If it keeps saying <i>too quiet</i>, raise it (it can’t distort), or tap <b>Check</b> and let Intervals choose.</dd>
+      </dl>
+      <div class="tip"><b>What’s a cent?</b> A hundredth of a semitone. Most listeners start to notice a note is out of tune somewhere around 10–20 cents;
+        a choir that holds within ±25 sounds in tune.</div>
+
+      <h3 id="h-progress">Your progress</h3>
+      <p>Every question is recorded. Choose <b>This session</b>, <b>Today</b> or <b>All time</b>, and <b>Sung</b>, <b>Named</b>, <b>Solfège</b> (sung or named by syllable) or <b>All</b>.</p>
+      <ul>
+        <li>The tiles show trials, right answers, accuracy, your current and best streak, and how many cents off you were on average when singing.</li>
+        <li>The row of dots is your recent history, oldest first:
+          <span class="dot" style="background:var(--good)"></span>right, <span class="dot" style="background:var(--amber)"></span>missed,
+          <span class="dot" style="border:2px solid var(--text-dim)"></span>heard the answer first. Hover (or long-press) a dot for details.</li>
+        <li>The table breaks it down by interval and direction, and <b>Mixed up with</b> shows what you tend to sing or choose instead — that’s where to practise next.</li>
+        <li><b>Export CSV</b> downloads every result as a spreadsheet. <b>Reset</b> erases them.</li>
+      </ul>
+      <p>Don’t want to see it? Settings › Display › <i>show my progress</i> hides this panel; results are still kept.</p>
+      <p class="dim">Results stay in this browser on this device — they aren’t sent anywhere, and a different browser or device starts fresh.
+        On iPhone and iPad, Intervals on the home screen counts as a different browser: it keeps its own results, separate from Safari’s.
+        Use <b>Export CSV</b> if you want to keep a copy of the old ones.</p>
+
+      <h3 id="h-hooks">Memory hooks</h3>
+      <p>Many singers learn intervals by tying each one to the opening of a familiar tune. Some common ones (rising):</p>
+      <table>
+        <tr><th>Interval</th><th>Sounds like the start of…</th></tr>
+        <tr><td>m2</td><td>The theme from <i>Jaws</i></td></tr>
+        <tr><td>M2</td><td><i>Happy Birthday</i> (“Happy <b>Birth</b>-”)</td></tr>
+        <tr><td>m3</td><td><i>Greensleeves</i></td></tr>
+        <tr><td>M3</td><td><i>When the Saints Go Marching In</i></td></tr>
+        <tr><td>P4</td><td><i>Here Comes the Bride</i>; <i>Amazing Grace</i></td></tr>
+        <tr><td>TT</td><td><i>Maria</i> from <i>West Side Story</i></td></tr>
+        <tr><td>P5</td><td><i>Twinkle, Twinkle, Little Star</i> (first to second “twinkle”)</td></tr>
+        <tr><td>m6</td><td><i>The Entertainer</i> (third to fourth note)</td></tr>
+        <tr><td>M6</td><td><i>My Bonnie Lies Over the Ocean</i>; the NBC chimes</td></tr>
+        <tr><td>m7</td><td><i>Somewhere</i> from <i>West Side Story</i></td></tr>
+        <tr><td>M7</td><td><i>Take On Me</i> (the chorus)</td></tr>
+        <tr><td>P8</td><td><i>Over the Rainbow</i> (“Some-where”)</td></tr>
+      </table>
+      <p class="dim">Better still, use tunes you already know by heart — your own repertoire works best.</p>
+
+      <h3 id="h-install">Install on your phone</h3>
+      <p>Intervals can live on your home screen like an app: its own icon, the whole screen to itself, and it works with no internet connection.
+        Nothing to download from an app store.</p>
+      <ul>
+        <li><b>iPhone or iPad:</b> open Intervals in <b>Safari</b> and tap <b>Share</b> (the square with an arrow) › <b>Add to Home Screen</b> › <b>Add</b>.</li>
+        <li><b>Android:</b> in Chrome, tap the <b>⋮</b> menu › <b>Add to Home screen</b> (or <b>Install app</b>).</li>
+        <li><b>Computer:</b> in Chrome or Edge, click the install icon at the right of the address bar.</li>
+      </ul>
+      <p>Open it once while you’re online. When <b>✓ offline ready</b> appears beside the version number at the top, everything it needs is saved on the device
+        and it will run anywhere — a rehearsal room with no signal, a train, a plane.
+        Whenever it opens with a connection it checks for a newer version and uses that.</p>
+      <p class="dim">An iPhone may ask for the microphone again each time you open the home-screen app; that’s Apple’s rule for web apps. Your results there are kept separately from Safari’s (see <i>Your progress</i>).</p>
+
+      <h3 id="h-keys">Keyboard</h3>
+      <p>With a keyboard attached, once you’ve pressed Start:</p>
+      <table>
+        <tr><th>Key</th><th>Does</th></tr>
+        <tr><td>Space</td><td>Reference, or do + start in Solfège (Sing) · play again (Name it) · play the target (Tuner)</td></tr>
+        <tr><td>K</td><td>Play the I–IV–V⁷–I cadence (Solfège)</td></tr>
+        <tr><td>A</td><td>Hear answer (Sing)</td></tr>
+        <tr><td>R</td><td>Try again (Sing)</td></tr>
+        <tr><td>1–9, 0, −, =</td><td>Answer by button position (Name it — intervals or syllables)</td></tr>
+        <tr><td>Enter</td><td>Next question</td></tr>
+        <tr><td>Esc</td><td>Stop — or close Help or Settings</td></tr>
+        <tr><td>?</td><td>Open this Help</td></tr>
+      </table>
+
+      <h3 id="h-trouble">Troubleshooting</h3>
+      <h4>The microphone won’t start</h4>
+      <p>Browsers only allow the microphone on a secure page (an address beginning <b>https://</b>). If you refused permission by mistake:
+        on iPad or iPhone, tap <b>aA</b> in Safari’s address bar › <b>Website Settings</b> › <b>Microphone</b> › <b>Allow</b>, then press Start again;
+        in Chrome or Edge, click the icon at the left of the address bar. <b>Name it</b> always works without a mic.</p>
+      <h4>It says “too quiet”, or ignores me</h4>
+      <p>Run the <b>microphone check</b> (Settings, or <b>Check</b> beside Boost) — it sets Boost for your voice. Or raise <b>Boost</b> yourself, move a little closer, and sing on a clear vowel (“ah” or “oo”). Consonants, breaths and whispering don’t have a pitch to measure.</p>
+      <h4>It says the microphone is sending only silence</h4>
+      <p>Tap <b>Restart mic</b> in the message. If that doesn’t help, reload the page. Closing other apps that use the microphone (video calls, voice memos) can also help.</p>
+      <h4>No sound at all on iPhone or iPad</h4>
+      <p>Check the volume buttons first. Intervals is designed to play even in Silent Mode; if yours still stays quiet, turn Silent Mode off
+        (the switch on the side, or the bell in Control Center), reload the page and try again — and let us know which device and iOS version.</p>
+      <h4>The sound stopped on my iPad</h4>
+      <p>iPadOS pauses web audio after a phone call, a notification or switching apps. Just tap anywhere on the page to wake it. Also check that the ringer/silent switch or Control Center isn’t muting sound.</p>
+      <h4>Android phones and tablets</h4>
+      <p>Use Chrome (or Samsung Internet) and allow the microphone when asked. If you refused it: tap the icon just left of the web address › Permissions › Microphone › Allow, and reload.
+        <b>Bluetooth headphones</b> are fine for listening, but if the phone uses the headset’s own microphone it drops into call-quality sound — wired headphones work best.
+        If the mic says it’s busy, close any app that might be using it (a call, a voice recorder, the voice assistant).</p>
+      <h4>It stopped when I locked the screen or switched apps</h4>
+      <p>That’s deliberate. When the page goes into the background, Intervals stops the drill, turns off the microphone and lets go of the sound,
+        so it doesn’t keep running (and draining the battery) behind your back. Tap <b>Start</b> when you come back.
+        While a drill is running, Intervals keeps the screen from dimming, so it won’t lock in the middle of a note.</p>
+      <h4>It thinks I sang the wrong octave</h4>
+      <p>Low voices’ overtones can sometimes fool a pitch detector. Choosing the right <b>Voice</b> in Settings helps; or tick <b>Octave</b> to accept the right note in any octave.</p>
+      <h4>Something else</h4>
+      <p>Tick <b>Troubleshooting</b> in Settings and note what the details line says — it shows what the microphone is really delivering.</p>
+
+      <p class="credits">Your voice is analysed right here in the browser — it is never recorded, stored or sent anywhere.
+        Piano: Salamander Grand Piano by Alexander Holm (CC BY 3.0). Pitch detection: the McLeod Pitch Method (McLeod &amp; Wyvill, 2005). Music symbols: Noto Music (SIL Open Font License).</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var APP_VERSION = '0.19';
+  document.getElementById('ver').textContent = 'v' + APP_VERSION;
+
+  /* =========================================================================
+   * MUSIC BASICS
+   * ========================================================================= */
+  var NAMES = ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+  function noteName(m){ m = Math.round(m); return NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1); }
+  function midiToHz(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+  function hzToMidi(f){ return 69 + 12 * Math.log2(f / 440); }
+
+  var INTERVALS = [
+    { semi: 1,  short: 'm2', name: 'minor 2nd' },
+    { semi: 2,  short: 'M2', name: 'major 2nd' },
+    { semi: 3,  short: 'm3', name: 'minor 3rd' },
+    { semi: 4,  short: 'M3', name: 'major 3rd' },
+    { semi: 5,  short: 'P4', name: 'perfect 4th' },
+    { semi: 6,  short: 'TT', name: 'tritone' },
+    { semi: 7,  short: 'P5', name: 'perfect 5th' },
+    { semi: 8,  short: 'm6', name: 'minor 6th' },
+    { semi: 9,  short: 'M6', name: 'major 6th' },
+    { semi: 10, short: 'm7', name: 'minor 7th' },
+    { semi: 11, short: 'M7', name: 'major 7th' },
+    { semi: 12, short: 'P8', name: 'octave' }
+  ];
+  function intervalName(semi){
+    var a = Math.abs(semi);
+    if (a === 0) return 'unison';
+    var oct = Math.floor((a - 1) / 12), base = INTERVALS[(a - 1) % 12];
+    return (oct ? 'compound ' : '') + base.name;
+  }
+  // "a" or "an" for an interval name: "an octave", "a minor 3rd", "a unison" (sounds like "you").
+  function article(word){ return /^(?:[aeio]|un(?!i))/i.test(word) ? 'an' : 'a'; }
+  function aIntervalName(semi){ var n = intervalName(semi); return article(n) + ' ' + n; }
+  function intervalShort(semi){
+    var a = Math.abs(semi);
+    if (a === 0) return 'P1';
+    if (a <= 12) return INTERVALS[a - 1].short;
+    return INTERVALS[(a - 1) % 12].short + '+8ve';
+  }
+
+  /* --- solfège (movable do, major keys) --- */
+  var KEYS = ['C','D♭','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];      // index = pitch class of do
+  // semitones above do -> [syllable, letter steps above do's letter, diatonic?]
+  // chromatic notes use the common choir syllables: di (raised do), me, fi, le, te (lowered mi, la, ti)
+  var SOLFA = [['do',0,1],['di',0,0],['re',1,1],['me',2,0],['mi',2,1],['fa',3,1],['fi',3,0],['sol',4,1],['le',5,0],['la',5,1],['te',6,0],['ti',6,1]];
+  var LETTERS = 'CDEFGAB', LETTER_PC = [0,2,4,5,7,9,11], ACC = { '-2':'𝄫', '-1':'♭', '0':'', '1':'♯', '2':'𝄪' };
+  function degOf(m){ return ((Math.round(m) - settings.key) % 12 + 12) % 12; }
+  function solfa(m){ return SOLFA[degOf(m)][0]; }
+  function isDiatonic(m){ return SOLFA[degOf(m)][2] === 1; }
+  function spell(m){                              // note name spelled for the current key: E♯5 in F♯ major, D♭4 in D♭
+    m = Math.round(m);
+    var li = (LETTERS.indexOf(KEYS[settings.key].charAt(0)) + SOLFA[degOf(m)][1]) % 7;
+    var acc = ((((m % 12) + 12) % 12 - LETTER_PC[li] + 18) % 12) - 6;
+    return LETTERS.charAt(li) + (ACC[acc] || '') + (Math.floor((m - acc) / 12) - 1);
+  }
+  function keyName(){ return KEYS[settings.key] + ' major'; }
+  // Intervals style (no key): spell a pair so the interval reads right on the staff -- a 3rd three
+  // letters up, a 5th five -- picking the start's spelling (C♯ or D♭...) that keeps both notes to
+  // single sharps or flats and avoids E♯ B♯ C♭ F♭ where it can. Returns { ref: 'E♭4', tgt: 'G4' }.
+  var IV_STEPS = [0,1,1,2,2,3,3,4,5,5,6,6];       // letter steps for 0-11 semitones (tritone: 3 or 4, whichever reads better)
+  function spellAt(m, li){
+    var acc = ((((m % 12) + 12) % 12 - LETTER_PC[li] + 18) % 12) - 6;
+    return { s: LETTERS.charAt(li) + (ACC[acc] || '') + (Math.floor((m - acc) / 12) - 1), acc: acc };
+  }
+  function oddness(sp){ return Math.abs(sp.acc) > 1 ? 20 : /^(E♯|B♯|C♭|F♭)/.test(sp.s) ? 4 : 0; }
+  function ivSpell(ref, semi){
+    ref = Math.round(ref); semi = Math.round(semi);
+    var r = Math.abs(semi) % 12, dir = semi < 0 ? -1 : 1, steps = r === 6 ? [3, 4] : [IV_STEPS[r]], best = null, plain = noteName(ref);
+    for (var li = 0; li < 7; li++){
+      var rs = spellAt(ref, li);
+      if (Math.abs(rs.acc) > 1) continue;
+      steps.forEach(function(st){
+        var ts = spellAt(ref + semi, ((li + dir * st) % 7 + 7) % 7);
+        var score = oddness(rs) + oddness(ts) + (rs.s === plain ? 0 : 1) + (st === 4 ? 0.5 : 0);
+        if (!best || score < best.score) best = { score: score, ref: rs.s, tgt: ts.s };
+      });
+    }
+    return best;
+  }
+  function arrowOf(semi){ return semi > 0 ? '↑' : semi < 0 ? '↓' : ''; }
+
+  // Comfortable ranges for drilling, in sounding pitch -- a little inside Harmonizer's
+  // standard ranges, since a reference AND an interval have to fit.
+  var VOICES = {
+    S:   { label: 'Soprano',  lo: 60, hi: 79 },   // C4–G5
+    A:   { label: 'Alto',     lo: 55, hi: 72 },   // G3–C5
+    T:   { label: 'Tenor',    lo: 48, hi: 67 },   // C3–G4 (sounding)
+    Bar: { label: 'Baritone', lo: 45, hi: 62 },   // A2–D4
+    B:   { label: 'Bass',     lo: 41, hi: 58 }    // F2–B♭3
+  };
+
+  /* =========================================================================
+   * PITCH DETECTION -- McLeod Pitch Method (MPM)
+   * detectPitch(samples, sampleRate, minHz, maxHz) -> { hz, clarity, rms } or { hz:0, ... }
+   * ========================================================================= */
+  var nsdf = null;
+  function detectPitch(buf, sr, minHz, maxHz){
+    var W = buf.length, i, j, mean = 0, rms = 0;
+    for (i = 0; i < W; i++) mean += buf[i];
+    mean /= W;
+    for (i = 0; i < W; i++) rms += (buf[i] - mean) * (buf[i] - mean);
+    rms = Math.sqrt(rms / W);
+    if (rms < 0.004) return { hz: 0, clarity: 0, rms: rms };                 // silence (0.2: was 0.008 -- iPad mics run quieter)
+    var tauMin = Math.max(2, Math.floor(sr / maxHz));
+    var tauMax = Math.min(Math.ceil(sr / minHz) + 2, Math.floor(W * 0.7));
+    if (!nsdf || nsdf.length < tauMax + 2) nsdf = new Float32Array(tauMax + 2);
+    // n(tau) = 2 * sum x[j]x[j+tau] / sum (x[j]^2 + x[j+tau]^2), j = 0..W-1-tau
+    var m = 0;
+    for (j = 0; j < W; j++){ var v = buf[j] - mean; m += 2 * v * v; }
+    for (var tau = 0; tau <= tauMax + 1; tau++){
+      if (tau > 0){ var a0 = buf[tau - 1] - mean, a1 = buf[W - tau] - mean; m -= a0 * a0 + a1 * a1; }
+      var r = 0;
+      for (j = 0; j < W - tau; j++) r += (buf[j] - mean) * (buf[j + tau] - mean);
+      nsdf[tau] = m > 0 ? 2 * r / m : 0;
+    }
+    // key maxima: the highest point of each positive lobe, after the first negative-going crossing
+    var peaks = [], t = 1;
+    while (t <= tauMax && nsdf[t] > 0) t++;                                   // skip the lobe at tau=0
+    while (t <= tauMax){
+      while (t <= tauMax && nsdf[t] <= 0) t++;                                // to the next positive lobe
+      var best = -1;
+      while (t <= tauMax && nsdf[t] > 0){
+        if (best < 0 || nsdf[t] > nsdf[best]) best = t;
+        t++;
+      }
+      if (best > 0 && best >= tauMin && best < tauMax) peaks.push(best);
+    }
+    if (!peaks.length) return { hz: 0, clarity: 0, rms: rms };
+    var top = 0;
+    peaks.forEach(function(p){ if (nsdf[p] > top) top = nsdf[p]; });
+    var pick = peaks[0];
+    for (i = 0; i < peaks.length; i++){ if (nsdf[peaks[i]] >= 0.9 * top){ pick = peaks[i]; break; } }
+    var a = nsdf[pick - 1], b = nsdf[pick], c = nsdf[pick + 1];
+    var den = a - 2 * b + c, shift = den ? (a - c) / (2 * den) : 0;
+    if (shift > 0.5 || shift < -0.5) shift = 0;
+    var peakVal = b - (a - c) * shift / 4;
+    return { hz: sr / (pick + shift), clarity: Math.min(1, peakVal), rms: rms };
+  }
+
+  /* =========================================================================
+   * AUDIO CONTEXT
+   * On iOS/iPadOS the context can be suspended or "interrupted" (a permission sheet, a phone
+   * call, switching apps), and only a tap may wake it -- so every tap on the page tries.
+   * ========================================================================= */
+  var audio = { ctx: null, master: null, buffers: null, sampleMidi: null, loading: null, playing: [] };
+
+  /* iOS Silent Mode: web audio is muted by the ring/silent switch (or the Control Center bell)
+   * unless the page is in a "playback" audio session -- or the microphone is on. */
+  var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var ANDROID = /Android/i.test(navigator.userAgent);
+  // Time between scheduling a sound and hearing it: large with Bluetooth headphones (0.15–0.3 s).
+  function outLat(){ var c = audio.ctx, l = c ? (c.outputLatency || c.baseLatency || 0) : 0; return l > 0 && l < 0.6 ? l : 0; }
+  // Keep the screen on during a drill: an auto-lock would hide the page, and hiding stops the drill.
+  var wake = null;
+  function keepAwake(){
+    if (wake || !navigator.wakeLock || !navigator.wakeLock.request) return;
+    navigator.wakeLock.request('screen').then(function(w){
+      if (!started){ w.release().catch(function(){}); return; }
+      wake = w; w.addEventListener('release', function(){ if (wake === w) wake = null; });
+    }).catch(function(){});
+  }
+  function letSleep(){ if (wake){ var w = wake; wake = null; w.release().catch(function(){}); } }
+  function setSession(kind){                     // 'playback' | 'play-and-record' (iOS 17+ / Safari 17+)
+    try { if (navigator.audioSession && navigator.audioSession.type !== kind) navigator.audioSession.type = kind; } catch(e){}
+  }
+  var unmuteEl = null;
+  function silentWav(){                          // half a second of silence, 8 kHz mono 16-bit
+    var n = 4000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), i, b = '', u;
+    function str(o, t){ for (var k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); }
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+    u = new Uint8Array(buf); for (i = 0; i < u.length; i++) b += String.fromCharCode(u[i]);
+    return 'data:audio/wav;base64,' + btoa(b);
+  }
+  function unmute(){                             // call from a tap
+    if (!IOS) return;
+    if (navigator.audioSession){ setSession(mic.stream ? 'play-and-record' : 'playback'); return; }
+    // older iOS: a looping silent <audio> element puts the page in the playback category
+    if (!unmuteEl){
+      unmuteEl = document.createElement('audio');
+      unmuteEl.setAttribute('playsinline', ''); unmuteEl.setAttribute('x-webkit-airplay', 'deny');
+      unmuteEl.loop = true; unmuteEl.preload = 'auto'; unmuteEl.src = silentWav();
+    }
+    if (unmuteEl.paused){ var pr = unmuteEl.play(); if (pr && pr.catch) pr.catch(function(){}); }
+  }
+  // Give it all back: without this, iOS keeps the page as a "now playing" media app (lock screen,
+  // Apple Watch) and the silent stream runs in the background, draining the battery.
+  function releaseAudio(){
+    letSleep();
+    stopAllSound();
+    if (unmuteEl && !unmuteEl.paused){ try { unmuteEl.pause(); } catch(e){} }
+    if (navigator.audioSession) setSession('auto');
+    if (audio.ctx && audio.ctx.state === 'running' && audio.ctx.suspend) audio.ctx.suspend().catch(function(){});
+    if ('mediaSession' in navigator){ try { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; } catch(e){} }
+  }
+  function makeCtx(rate){
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    var ctx = null;
+    if (rate){ try { ctx = new Ctor({ sampleRate: rate }); } catch(e){ ctx = null; } }
+    if (!ctx) ctx = new Ctor();
+    audio.ctx = ctx;
+    audio.master = ctx.createGain(); audio.master.gain.value = 0.8; audio.master.connect(ctx.destination);
+    ctx.onstatechange = function(){ console.log('*** audio context: ' + ctx.state); checkCtxState(); };
+    console.log('*** new AudioContext at ' + ctx.sampleRate + ' Hz');
+  }
+  function ensureCtx(){                          // call from a tap/click
+    unmute();
+    if (!audio.ctx) makeCtx();
+    if (audio.ctx.state !== 'running' && audio.ctx.resume) audio.ctx.resume().catch(function(){});
+  }
+  function checkCtxState(){
+    if (!started || !audio.ctx) return;
+    if (audio.ctx.state !== 'running') setStatus('The iPad has paused the sound. Tap anywhere to wake it.', true);
+    else if (ctxWasAsleep) restoreStatus();
+    ctxWasAsleep = audio.ctx.state !== 'running';
+  }
+  var ctxWasAsleep = false;
+  document.addEventListener('pointerdown', function(){
+    if (!started) return;                        // buttons that play sound call ensureCtx() themselves
+    unmute();
+    if (audio.ctx && audio.ctx.state !== 'running' && audio.ctx.resume) audio.ctx.resume().catch(function(){});
+  }, true);
+  function wentAway(){                           // screen locked, another app or tab: stop, and let go of the audio
+    if (started){ stop(); setStatus('Stopped while Intervals was in the background. Tap <b>Start</b> to carry on.'); }
+    if (mc.on){ mcStop(); if (mic.analyser) stopMic(); mcIdle(); }
+    releaseAudio();
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden){ wentAway(); return; }
+    if (started && audio.ctx && audio.ctx.state !== 'running' && audio.ctx.resume) audio.ctx.resume().catch(function(){});
+  });
+  window.addEventListener('pagehide', wentAway);
+
+  /* =========================================================================
+   * PIANO (the Salamander samples, cloned from Harmonizer)
+   * ========================================================================= */
+  var SAMPLES_URL = 'intervals-piano-samples.json';
+  function b64ToArrayBuffer(b64){
+    var bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  function sampleNameToMidi(name){
+    var m = /^([A-G])(#?)(-?\d+)$/.exec(name); if (!m) return null;
+    var base = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 }[m[1]] + (m[2] ? 1 : 0);
+    return base + 12 * (parseInt(m[3], 10) + 1);
+  }
+  function loadPiano(){
+    if (audio.loading) return audio.loading;
+    setStatus('Loading the piano…');
+    var ctx = audio.ctx;
+    audio.loading = fetch(SAMPLES_URL).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(map){
+        audio.buffers = {}; audio.sampleMidi = {};
+        return Promise.all(Object.keys(map).map(function(name){
+          var mi = sampleNameToMidi(name); if (mi == null) return null;
+          return new Promise(function(res){
+            ctx.decodeAudioData(b64ToArrayBuffer(map[name]), function(buf){ audio.buffers[name] = buf; audio.sampleMidi[name] = mi; res(); },
+              function(){ res(); });
+          });
+        }));
+      })
+      .catch(function(err){ audio.loading = null; throw err; });
+    return audio.loading;
+  }
+  function playNote(midi, when, dur, vol){
+    vol = vol || 0.9;
+    if (!audio.buffers) return;
+    var best = null, bd = 1e9;
+    for (var n in audio.sampleMidi){ var d = Math.abs(audio.sampleMidi[n] - midi); if (d < bd){ bd = d; best = n; } }
+    if (!best) return;
+    var ctx = audio.ctx, src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = audio.buffers[best];
+    src.playbackRate.value = Math.pow(2, (midi - audio.sampleMidi[best]) / 12);
+    g.gain.setValueAtTime(vol, when);
+    g.gain.setValueAtTime(vol, when + dur);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur + 0.25);
+    src.connect(g); g.connect(audio.master);
+    src.start(when); src.stop(when + dur + 0.3);
+    audio.playing.push(src);
+    src.onended = function(){ var i = audio.playing.indexOf(src); if (i >= 0) audio.playing.splice(i, 1); };
+  }
+  function stopAllSound(){
+    audio.playing.slice().forEach(function(src){ try { src.stop(); } catch(e){} });
+    audio.playing = [];
+  }
+
+  /* =========================================================================
+   * MICROPHONE
+   * The mic is opened FIRST; if the context's rate doesn't match what the mic reports, the
+   * context is rebuilt at the mic's rate (older iPadOS delivers silence from a mismatched
+   * MediaStreamSource). The analyser is pulled through a zero gain to the output, because
+   * WebKit doesn't always process a node that doesn't lead to the destination.
+   * ========================================================================= */
+  var mic = { stream: null, source: null, boost: null, analyser: null, sink: null, buf: null, bytes: null, pending: null };
+  function ensureMic(){
+    if (mic.analyser) return Promise.resolve();
+    if (mic.pending) return mic.pending;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      return Promise.reject(new Error('insecure'));
+    }
+    setStatus('Asking for the microphone…');
+    setSession('play-and-record');
+    mic.pending = navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+      .then(function(stream){
+        mic.stream = stream;
+        var track = stream.getAudioTracks()[0];
+        var st = track && track.getSettings ? track.getSettings() : {};
+        console.log('*** mic track: ' + (track ? track.label : '?') + ', rate ' + st.sampleRate + ', context rate ' + audio.ctx.sampleRate);
+        // Always rebuild the context now that recording has started: iPadOS switches the audio
+        // hardware (rate, route) when the mic opens, and a context made before that can deliver
+        // garbled mic audio -- a level that moves, but no clean pitch. Piano buffers carry over.
+        var old = audio.ctx;
+        stopAllSound();
+        makeCtx(st.sampleRate || 0);
+        try { old.close(); } catch(e){}
+        listenFrom = 0;
+        if (audio.ctx.resume) audio.ctx.resume().catch(function(){});
+        connectMic();
+        mic.pending = null;
+      }, function(err){ mic.pending = null; throw err; });
+    return mic.pending;
+  }
+  function btNote(){                             // a Bluetooth headset mic drags the phone into call-quality audio
+    var tr = mic.stream && mic.stream.getAudioTracks()[0];
+    if (tr && /bluetooth|hands-?free|headset|airpods|buds|\bbt\b/i.test(tr.label || ''))
+      setStatus('The microphone is a <b>Bluetooth headset</b> (' + tr.label + '). Phones switch to call-quality sound for these, so the piano may sound thin and pitch reading is less reliable. Wired headphones, or Bluetooth headphones with the phone’s own mic, work better.', true);
+  }
+  function connectMic(){
+    var ctx = audio.ctx;
+    mic.source = ctx.createMediaStreamSource(mic.stream);
+    mic.analyser = ctx.createAnalyser();
+    mic.analyser.fftSize = 2048;
+    mic.sink = ctx.createGain(); mic.sink.gain.value = 0;      // silent: keeps the analyser pulled, never feeds back
+    mic.boost = ctx.createGain(); mic.boost.gain.value = settings.micGain;   // soft singing: float path, so no clipping
+    mic.source.connect(mic.boost); mic.boost.connect(mic.analyser); mic.analyser.connect(mic.sink); mic.sink.connect(ctx.destination);
+    mic.buf = new Float32Array(mic.analyser.fftSize);
+    mic.bytes = new Uint8Array(mic.analyser.fftSize);
+    watch.since = ctx.currentTime; watch.lastSound = ctx.currentTime; watch.warned = false;
+  }
+  function stopMic(){
+    try { if (mic.boost) mic.boost.disconnect(); if (mic.source) mic.source.disconnect(); if (mic.analyser) mic.analyser.disconnect(); if (mic.sink) mic.sink.disconnect(); } catch(e){}
+    if (mic.stream) mic.stream.getTracks().forEach(function(t){ t.stop(); });
+    mic.stream = mic.source = mic.boost = mic.analyser = mic.sink = null;
+    if (IOS) setSession('playback');
+  }
+  function readMic(){
+    if (mic.analyser.getFloatTimeDomainData) mic.analyser.getFloatTimeDomainData(mic.buf);
+    else {                                                        // Safari before 14.1
+      mic.analyser.getByteTimeDomainData(mic.bytes);
+      for (var i = 0; i < mic.bytes.length; i++) mic.buf[i] = (mic.bytes[i] - 128) / 128;
+    }
+  }
+  function restartMic(){                         // from a tap
+    stopMic();
+    ensureCtx();
+    ensureMic().then(function(){ setStatus('Microphone restarted. Sing something and watch the Mic bar.'); if (singing() && q) retry(); })
+      .catch(micError);
+  }
+  // watchdog: a mic that is "on" but only ever delivers digital silence
+  var watch = { since: 0, lastSound: 0, warned: false };
+
+  /* =========================================================================
+   * STATE & STORAGE
+   * ========================================================================= */
+  var $ = function(id){ return document.getElementById(id); };
+  var STORE = 'intervals-v2', OLD_STORE = 'intervals-v1';
+  var settings = { mode: 'sing', voice: 'A', dir: 'up', ivals: [3, 4, 5, 7, 8, 9, 12], tol: 25, anyOct: false, hold: 800,
+                   play: 'melodic', autoNext: true, scope: 'session', kind: 'all', tunerNote: null, diag: false, micGain: 4, nextDelay: 2000,
+                   key: 0, solfaChrom: false, keyEvery: false, solfa: false, report: true, showStats: true };
+  var log = [];        // one entry per question: { t, m:'sing'|'solfa'|'tap'|'tapsolfa', k?: key (solfa), ts?: target syllable (solfa), s: signed semitones, ok, c?: cents, g?: what you gave, h?: heard answer first, r?: retries, fix?: got it on a retry }
+  var LOG_MAX = 20000;
+  var sessionStart = Date.now();
+  var firstRun = true;   // nothing saved in this browser yet: show the welcome note
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved){ firstRun = false; if (saved.settings) Object.assign(settings, saved.settings); if (saved.log) log = saved.log; }
+    else {
+      var v1 = JSON.parse(localStorage.getItem(OLD_STORE) || 'null');     // 0.1's per-interval tallies -> undated log entries
+      if (v1){
+        firstRun = false;
+        if (v1.settings) Object.assign(settings, v1.settings);
+        Object.keys(v1.stats || {}).forEach(function(k){
+          var s = v1.stats[k], p = k.split(':'), semi = (p[0] === 'down' ? -1 : 1) * +p[1], avg = s.n ? Math.round(s.errSum / s.n) : 0;
+          for (var i = 0; i < s.n; i++) log.push({ t: 0, m: 'sing', s: semi, ok: i < s.ok, c: avg, old: 1 });
+        });
+      }
+    }
+  } catch(e){ console.log('*** could not read saved data', e); }
+  if (/[?&]welcome\b/.test(location.search)) firstRun = true;          // ?welcome shows the welcome note again
+  if ('tunerPc' in settings){                                          // 0.3-0.13: pitch class + octave -> one MIDI note
+    if (settings.tunerPc != null) settings.tunerNote = settings.tunerPc + 12 * ((settings.tunerOct || 3) + 1);
+    delete settings.tunerPc; delete settings.tunerOct;
+  }
+  if (!VOICES[settings.voice]) settings.voice = 'A';
+  if (settings.mode === 'drill') settings.mode = 'sing';
+  if (settings.mode === 'solfa'){ settings.mode = 'sing'; settings.solfa = true; }     // 0.7's Solfège mode is now Sing + the Solfège switch
+  function save(){ try { localStorage.setItem(STORE, JSON.stringify({ settings: settings, log: log })); } catch(e){ console.log('*** save failed', e); } }
+
+  var mode = settings.mode === 'tap' ? 'tap' : 'sing';   // tuner is never restored: it needs a tap to start the mic
+  var started = false;
+  var phase = 'off';      // sing mode: off | prompting | listening | graded
+  var q = null;           // { ref, semi, target, rec, helped, answered }
+  var lastQ = null;
+  var listenFrom = 0;     // audio time when listening may begin (after the piano dies away)
+  var run = [];           // current voiced run: [{ t, midi }]
+  var trace = [];         // [{ t, midi, ok }] for the canvas
+  var TRACE_SECS = 6;
+  var autoTimer = null;
+  var baseStatus = '';
+  var needKey = true;     // solfège: play the cadence before the next question (first one, and after a key change)
+  function singing(){ return mode === 'sing'; }
+  function sf(){ return !!settings.solfa && mode !== 'tuner'; }        // drilling by solfège (Sing or Name it)
+  function doBelow(m){ return Math.round(m) - degOf(m); }              // the do at or below a note
+  function pcName(deg){ return spell(60 + settings.key + deg).replace(/-?\d+$/, ''); }
+  function lbl(m){ return sf() ? solfa(m) + ' (' + spell(m) + ')' : noteName(m); }
+
+  function setStatus(msg, warn){ var s = $('status'); s.innerHTML = msg; s.className = warn ? 'warn' : ''; if (!warn) baseStatus = msg; }
+  function restoreStatus(){ setStatus(baseStatus || '&nbsp;'); }
+  function idleStatus(){
+    if (mode === 'tap' && sf()) setStatus('<b>Name it · Solfège</b>: choose a key. You hear the key (I–IV–V⁷–I), then <b>do</b>, a starting note, and a mystery note; tap its syllable. No microphone needed. Press <b>Start</b>.');
+    else if (mode === 'tap') setStatus('<b>Name it</b>: you hear two notes and tap the interval. No microphone needed. Press <b>Start</b>.');
+    else if (sf()) setStatus('<b>Sing · Solfège</b>: choose a key. You hear the key (I–IV–V⁷–I), then <b>do</b>, then a starting note; then you see which syllable to sing. Press <b>Start</b> and allow the microphone.');
+    else if (mode === 'sing') setStatus('<b>Sing</b>: you hear a note and sing the interval; the microphone grades it. Press <b>Start</b> and allow the microphone. Headphones help.');
+    else setStatus('<b>Tuner</b>: shows the note you sing. Press <b>Start</b> and allow the microphone.');
+  }
+
+  /* --- setup UI --- */
+  function buildSetup(){
+    var vs = $('voice');
+    Object.keys(VOICES).forEach(function(k){
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.v = k; b.setAttribute('role', 'radio');
+      b.innerHTML = VOICES[k].label + rangeStaff(k) + '<small>' + noteName(VOICES[k].lo) + '–' + noteName(VOICES[k].hi) + '</small>';
+      b.addEventListener('click', function(){ setVoice(k); });
+      vs.appendChild(b);
+    });
+    showVoice();
+    var box = $('ivals');
+    INTERVALS.forEach(function(iv){
+      var l = document.createElement('label'); l.title = iv.name;
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = iv.semi;
+      cb.checked = settings.ivals.indexOf(iv.semi) >= 0;
+      cb.addEventListener('change', readSetup);
+      l.appendChild(cb); l.appendChild(document.createTextNode(iv.short)); box.appendChild(l);
+    });
+    [['All', INTERVALS.map(function(i){ return i.semi; })], ['Consonant', [3,4,5,7,8,9,12]], ['Steps', [1,2]]].forEach(function(x){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'quick'; b.textContent = x[0];
+      b.addEventListener('click', function(){ box.querySelectorAll('input').forEach(function(cb){ cb.checked = x[1].indexOf(+cb.value) >= 0; }); readSetup(); });
+      box.appendChild(b);
+    });
+    $('tol').value = String(settings.tol); $('anyOct').checked = settings.anyOct; $('hold').value = String(settings.hold);
+    $('play').value = settings.play; $('autoNext').checked = settings.autoNext; $('diagChk').checked = settings.diag; $('nextDelay').value = String(settings.nextDelay);
+    $('solfaChrom').checked = settings.solfaChrom; $('keyEvery').checked = settings.keyEvery;
+    $('report').checked = settings.report !== false; $('showStats').checked = settings.showStats !== false; showStatsPanel();
+    ['tol','anyOct','hold','play','autoNext','diagChk','nextDelay','solfaChrom','keyEvery','report','showStats'].forEach(function(id){ $(id).addEventListener('change', readSetup); });
+  }
+  function readSetup(){
+    settings.tol = +$('tol').value;
+    settings.anyOct = $('anyOct').checked; settings.hold = +$('hold').value;
+    settings.play = $('play').value; settings.autoNext = $('autoNext').checked; settings.diag = $('diagChk').checked; settings.nextDelay = +$('nextDelay').value;
+    settings.solfaChrom = $('solfaChrom').checked; settings.keyEvery = $('keyEvery').checked;
+    settings.report = $('report').checked; settings.showStats = $('showStats').checked; showStatsPanel();
+    $('diag').classList.toggle('hidden', !settings.diag);
+    settings.ivals = [].map.call($('ivals').querySelectorAll('input:checked'), function(cb){ return +cb.value; });
+    save(); drawBand(); renderStaff();
+    if (mode === 'tap' && q && !q.answered) buildAnswers();
+  }
+
+  function showStatsPanel(){ $('statsPanel').classList.toggle('hidden', settings.showStats === false); }
+  function showVoice(){
+    $('voice').querySelectorAll('button').forEach(function(b){ var on = b.dataset.v === settings.voice; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
+  }
+  function setVoice(k){                           // Settings › Voice: drills use it from the next question; the Tuner follows it too
+    settings.voice = k; save(); showVoice(); renderStaff();
+    if (mode === 'tuner'){ tunerVoice = k; fitTunerNote(); tunerChanged(false); }
+    drawTrace(audio.ctx ? audio.ctx.currentTime : 0);
+    console.log('*** voice ->', k);
+  }
+
+  /* --- key picker (Solfège) --- */
+  function buildKeyPick(){
+    var ks = $('keySel');
+    KEYS.forEach(function(k, i){ var o = document.createElement('option'); o.value = i; o.textContent = k + ' major'; ks.appendChild(o); });
+    ks.value = String(settings.key); showScale();
+    ks.addEventListener('change', function(){
+      settings.key = +ks.value; save(); showScale(); needKey = true; renderStaff();
+      if (started && sf()){ restartDrill(); }   // new key: play it, then a fresh question
+      else drawTrace(audio.ctx ? audio.ctx.currentTime : 0);
+    });
+  }
+  function showScale(){                           // "C D E F G A B" spelled for the key, under the picker
+    var d = [0, 2, 4, 5, 7, 9, 11].map(function(x){ return spell(60 + settings.key + x).replace(/-?\d+$/, ''); });
+    $('keyScale').textContent = 'do = ' + d[0] + ' · ' + d.join(' ');
+  }
+
+  /* --- questions --- */
+  function newQuestion(){
+    var v = VOICES[settings.voice] || VOICES.A;
+    var pool = settings.ivals.length ? settings.ivals : [7];
+    for (var tries = 0; tries < 50; tries++){
+      var semi = pool[Math.floor(Math.random() * pool.length)];
+      var down = settings.dir === 'down' || (settings.dir === 'both' && Math.random() < 0.5);
+      if (down) semi = -semi;
+      var lo = Math.max(v.lo, v.lo - semi), hi = Math.min(v.hi, v.hi - semi);   // ref and target both in range
+      if (hi < lo) continue;
+      var ref = lo + Math.floor(Math.random() * (hi - lo + 1));
+      if (lastQ && lastQ.ref === ref && lastQ.semi === semi && tries < 40) continue;
+      return { ref: ref, semi: semi, target: ref + semi };
+    }
+    return { ref: v.lo, semi: 7, target: v.lo + 7 };
+  }
+  function newSolfaQuestion(){
+    // reference: any do–ti note in the voice's range; target: a chosen interval away, in range,
+    // and in the key (or chromatic, if that's switched on)
+    var v = VOICES[settings.voice] || VOICES.A, pool = settings.ivals.length ? settings.ivals : [7], cands = [];
+    for (var ref = v.lo; ref <= v.hi; ref++){
+      if (!isDiatonic(ref)) continue;
+      pool.forEach(function(a){
+        [1, -1].forEach(function(sg){
+          if ((settings.dir === 'up' && sg < 0) || (settings.dir === 'down' && sg > 0)) return;
+          var t = ref + sg * a;
+          if (t < v.lo || t > v.hi || (!settings.solfaChrom && !isDiatonic(t))) return;
+          cands.push({ ref: ref, semi: sg * a, target: t });
+        });
+      });
+    }
+    if (!cands.length) return newQuestion();
+    var fresh = cands.filter(function(c){ return !lastQ || c.ref !== lastQ.ref || c.semi !== lastQ.semi; });
+    var list = fresh.length ? fresh : cands;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  function scheduleNext(){
+    cancelNext();
+    if (!settings.autoNext) return;
+    var ms = settings.nextDelay || 2000, cd = $('countdown'), bar = cd.firstElementChild;
+    cd.classList.remove('hidden');
+    bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
+    bar.style.transition = 'width ' + ms + 'ms linear'; bar.style.width = '0';
+    autoTimer = setTimeout(ask, ms);
+  }
+  function cancelNext(){ clearTimeout(autoTimer); autoTimer = null; $('countdown').classList.add('hidden'); }
+  function flash(ok){
+    var f = $('flash'), pnl = $('drillPanel');
+    f.textContent = ok ? '✓' : '✗';
+    f.className = 'flash ' + (ok ? 'ok' : 'bad'); pnl.classList.remove('glow-ok', 'glow-bad');
+    void f.offsetWidth;
+    f.classList.add('go'); pnl.classList.add(ok ? 'glow-ok' : 'glow-bad');
+  }
+  function ask(){
+    cancelNext();
+    if (!started || mode === 'tuner') return;
+    lastQ = q; q = sf() ? newSolfaQuestion() : newQuestion();
+    $('result').innerHTML = ''; $('result').className = 'result';
+    $('tapResult').innerHTML = ''; $('tapResult').className = 'result';
+    seqClear(); avgReset();
+    if (sf() && mode === 'sing'){
+      $('ask').innerHTML = 'Listen…';                        // the syllable to sing appears once do and the start note have sounded
+      $('refLine').innerHTML = '&nbsp;';
+      q.stage = 0; renderStaff();
+      drawBand(); playReference();
+    } else if (sf()){
+      $('ask').innerHTML = 'Listen…';
+      $('refLine').innerHTML = '&nbsp;';
+      q.stage = 0; renderStaff();
+      buildAnswers(); playQuestion();
+    } else if (mode === 'sing'){
+      q.stage = 0; renderStaff();
+      $('ask').innerHTML = 'Sing ' + article(intervalName(q.semi)) + ' <em>' + intervalName(q.semi) + '</em> ' + (q.semi > 0 ? 'above' : 'below');
+      $('refLine').innerHTML = 'Reference <b>' + ivSpell(q.ref, q.semi).ref + '</b>';
+      drawBand(); playReference();
+    } else {
+      q.stage = 0; renderStaff();
+      $('ask').innerHTML = 'Which interval?';
+      $('refLine').innerHTML = settings.play === 'harmonic' ? 'Two notes together' : 'Starting on <b>' + ivSpell(q.ref, q.semi).ref + '</b>';
+      buildAnswers(); playQuestion();
+    }
+    updateButtons();
+  }
+  /* --- the staff (Sing · Solfège and Name it · Solfège) ---
+   * Staff positions: 0 = bottom line, 8 = top line, 1 step = half a staff space. Glyphs are drawn
+   * with their baseline half a space below the pitch they belong to (how Noto Music is built). */
+  var SHARP_ORDER = 'FCGDAE', FLAT_ORDER = 'BEADGC';
+  var SHARP_POS = [8, 5, 9, 6, 3, 7], FLAT_POS = [4, 7, 3, 6, 2, 5];      // treble; bass clef is two steps lower
+  var KEY_SIG = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];                  // by pitch class of do: + sharps, − flats
+  var GLYPH = { clefG: '\uD834\uDD1E', clefF: '\uD834\uDD22', whole: '\uD834\uDD5D',
+                '-2': '\uD834\uDD2B', '-1': '\u266D', '0': '\u266E', '1': '\u266F', '2': '\uD834\uDD2A' };
+  function clefKind(){ var v = settings.voice; return v === 'S' || v === 'A' ? 'treble' : v === 'T' ? 'treble8' : 'bass'; }
+  function parseSpell(m, sp){
+    var x = /^([A-G])(.*?)(-?\d+)$/.exec(sp || spell(m));
+    var acc = { '': 0, '♯': 1, '♭': -1, '𝄪': 2, '𝄫': -2 }[x[2]] || 0;
+    return { letter: x[1], acc: acc, oct: +x[3] };
+  }
+  function staffPos(m, sp){
+    var n = parseSpell(m, sp), d = 'CDEFGAB'.indexOf(n.letter) + 7 * n.oct, c = clefKind();
+    return c === 'bass' ? d - 18 : c === 'treble8' ? d + 7 - 30 : d - 30;    // bottom line: E4 treble, G2 bass
+  }
+  function keyAcc(letter){                         // what the key signature does to this letter
+    var k = KEY_SIG[settings.key];
+    if (k > 0 && SHARP_ORDER.slice(0, k).indexOf(letter) >= 0) return 1;
+    if (k < 0 && FLAT_ORDER.slice(0, -k).indexOf(letter) >= 0) return -1;
+    return 0;
+  }
+  // notes: [{ m, lab, cls, sp? (spelling, e.g. 'F♯4'; default: spelled for the key) }]; noKey: no key signature (Intervals style)
+  function drawStaff(notes, width, noKey){
+    var W = width || 250, sp = 10, bot = 78, c = clefKind(), shift = c === 'bass' ? -2 : 0;
+    var low = Math.min.apply(null, [0].concat(notes.map(function(nt){ return staffPos(nt.m, nt.sp); })));
+    var H = 150 + Math.max(0, -5 - low) * 5;               // make room under very low notes so the labels stay clear
+    function y(p){ return bot - p * sp / 2; }
+    var o = '<svg class="staff" viewBox="0 0 ' + W + ' ' + H + '" role="img">';
+    for (var i = 0; i < 5; i++) o += '<line class="ln" x1="6" x2="' + (W - 6) + '" y1="' + y(2 * i) + '" y2="' + y(2 * i) + '"/>';
+    if (c === 'bass') o += '<text class="mus" x="10" y="' + (y(0) - sp / 2) + '" font-size="40">' + GLYPH.clefF + '</text>';
+    else {
+      o += '<text class="mus" x="8" y="' + y(0) + '" font-size="40">' + GLYPH.clefG + '</text>';
+      if (c === 'treble8') o += '<text class="clef8" x="18" y="' + (y(0) + 26) + '">8</text>';
+    }
+    var k = noKey ? 0 : KEY_SIG[settings.key], n = Math.abs(k), pos = k > 0 ? SHARP_POS : FLAT_POS, x = 46;
+    for (i = 0; i < n; i++, x += 10) o += '<text class="mus" x="' + x + '" y="' + (y(pos[i] + shift) + sp / 2) + '" font-size="40">' + GLYPH[k > 0 ? '1' : '-1'] + '</text>';
+    x = Math.max(x + 16, 70);
+    var pss = notes.map(function(nt){ return parseSpell(nt.m, nt.sp); });
+    var hasAcc = pss.map(function(ps, j){
+      if (ps.acc !== (noKey ? 0 : keyAcc(ps.letter))) return true;
+      return pss.slice(0, j).some(function(o){ return o.letter === ps.letter && o.oct === ps.oct && o.acc !== ps.acc; });   // F♯ then F: show the natural
+    });
+    var units = Math.max(3, notes.length) + hasAcc.slice(1).filter(Boolean).length * 0.45;   // room for an accidental after the first note
+    var step = Math.min(58, (W - x - 30) / units), nx = x + 12 - step;
+    notes.forEach(function(nt, j){
+      nx += step + (j && hasAcc[j] ? 0.45 * step : 0);
+      var p = staffPos(nt.m, nt.sp), ps = pss[j], g = '<g class="n-' + (nt.cls || 'plain') + '">';
+      for (var L = -2; L >= p; L -= 2) g += '<line class="ln" x1="' + (nx - 6) + '" x2="' + (nx + 26) + '" y1="' + y(L) + '" y2="' + y(L) + '"/>';
+      for (L = 10; L <= p; L += 2) g += '<line class="ln" x1="' + (nx - 6) + '" x2="' + (nx + 26) + '" y1="' + y(L) + '" y2="' + y(L) + '"/>';
+      if (hasAcc[j]) g += '<text class="mus" x="' + (nx - 13) + '" y="' + (y(p) + sp / 2) + '" font-size="40">' + GLYPH[String(ps.acc)] + '</text>';
+      g += '<text class="mus" x="' + nx + '" y="' + (y(p) + 5.4) + '" font-size="40">' + GLYPH.whole + '</text>';
+      g += '<text class="lab" x="' + (nx + 10) + '" y="' + (H - 18) + '">' + nt.lab + '</text>';
+      g += '<text class="nm" x="' + (nx + 10) + '" y="' + (H - 5) + '">' + (nt.sp || spell(nt.m)) + '</text></g>';
+      o += g;
+    });
+    return o + '</svg>';
+  }
+  function renderStaff(){
+    var box = $('staffBox');
+    if (mode === 'tuner' || !started){ box.innerHTML = ''; return; }
+    var notes = [], st = q ? (q.stage || 0) : 0, iv = !sf(), hit;
+    if (q && iv){                                // Intervals style: start note, then the second note / where you sang
+      var sp = ivSpell(q.ref, q.semi), tl = intervalShort(q.semi) + arrowOf(q.semi);
+      if (st >= 2) notes.push({ m: q.ref, sp: sp.ref, lab: 'start', cls: 'start' });
+      if (mode === 'tap'){
+        if (st >= 3) notes.push({ m: q.target, sp: sp.tgt, lab: tl, cls: q.gotIt ? 'ok' : 'bad' });
+      } else {
+        hit = q.sung != null && q.sungOk;
+        if (!hit && (q.heard || q.sung != null)) notes.push({ m: q.target, sp: sp.tgt, lab: tl, cls: 'target' });
+        if (q.sung != null){
+          var ds = q.sung - q.ref;
+          notes.push({ m: q.sung, sp: hit && q.sung === q.target ? sp.tgt : ivSpell(q.ref, ds).tgt, lab: hit ? tl : intervalShort(ds) + arrowOf(ds), cls: hit ? 'ok' : 'bad' });
+        }
+      }
+    } else if (q){
+      var d = doBelow(q.ref);
+      if (st >= 1 && d !== q.ref) notes.push({ m: d, lab: 'do' });
+      if (st >= 2) notes.push({ m: q.ref, lab: solfa(q.ref), cls: 'start' });
+      if (mode === 'tap'){
+        if (st >= 3) notes.push({ m: q.target, lab: solfa(q.target), cls: q.gotIt ? 'ok' : 'bad' });
+      } else {                                   // Sing: the target (if heard, or if you missed it), then where you landed
+        hit = q.sung != null && q.sungOk;
+        if (!hit && (q.heard || q.sung != null)) notes.push({ m: q.target, lab: solfa(q.target), cls: 'target' });
+        if (q.sung != null) notes.push({ m: q.sung, lab: solfa(q.sung), cls: hit ? 'ok' : 'bad' });
+      }
+    }
+    box.innerHTML = drawStaff(notes, mode === 'tap' ? 250 : 290, iv) + '<div class="cap">' + (iv ? '' : keyName() + ' · ') +
+      { treble: 'treble clef', treble8: 'tenor (treble 8vb)', bass: 'bass clef' }[clefKind()] + '</div>';
+  }
+  // A voice part's range on a small staff in its own clef: lowest and highest notes on a shaded
+  // band, plus (optionally) a target note in cyan between them. Spelled like noteName (C♯, E♭…).
+  var VCLEF = { S: 'treble', A: 'treble', T: 'treble8', Bar: 'bass', B: 'bass' };
+  function rangeStaff(k, target){
+    var v = VOICES[k], c = VCLEF[k], sp = 7, bot = 60, W = 104, H = 82;
+    function y(p){ return bot - p * sp / 2; }
+    function pos(m){
+      m = Math.round(m);
+      var d = 'CDEFGAB'.indexOf(noteName(m).charAt(0)) + 7 * (Math.floor(m / 12) - 1);
+      return c === 'bass' ? d - 18 : c === 'treble8' ? d - 23 : d - 30;
+    }
+    function acc(m){ var ch = noteName(m).charAt(1); return ch === '♯' ? '1' : ch === '♭' ? '-1' : null; }
+    var o = '<svg class="rstaff" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">';
+    var pl = pos(v.lo), ph = pos(v.hi);
+    o += '<rect class="rb" x="26" width="' + (W - 28) + '" y="' + (y(ph) - 3) + '" height="' + (y(pl) - y(ph) + 6) + '" rx="3"/>';
+    for (var i = 0; i < 5; i++) o += '<line class="ln" x1="3" x2="' + (W - 3) + '" y1="' + y(2 * i) + '" y2="' + y(2 * i) + '"/>';
+    if (c === 'bass') o += '<text class="mus" x="5" y="' + (y(0) - sp / 2) + '" font-size="28">' + GLYPH.clefF + '</text>';
+    else {
+      o += '<text class="mus" x="4" y="' + y(0) + '" font-size="28">' + GLYPH.clefG + '</text>';
+      if (c === 'treble8') o += '<text class="clef8" x="10.5" y="' + (y(0) + 18.5) + '">8</text>';
+    }
+    var notes = target != null ? [[v.lo, 34, ''], [target, 58, 'tg'], [v.hi, 82, '']] : [[v.lo, 40, ''], [v.hi, 74, '']];
+    notes.forEach(function(n){
+      var m = n[0], x = n[1], p = pos(m), a = acc(m), g = '<g class="' + n[2] + '">';
+      for (var L = -2; L >= p; L -= 2) g += '<line class="ln" x1="' + (x - 3.5) + '" x2="' + (x + 17) + '" y1="' + y(L) + '" y2="' + y(L) + '"/>';
+      for (L = 10; L <= p; L += 2) g += '<line class="ln" x1="' + (x - 3.5) + '" x2="' + (x + 17) + '" y1="' + y(L) + '" y2="' + y(L) + '"/>';
+      if (a) g += '<text class="mus" x="' + (x - 8.5) + '" y="' + (y(p) + sp / 2) + '" font-size="28">' + GLYPH[a] + '</text>';
+      g += '<text class="mus" x="' + x + '" y="' + (y(p) + 3.8) + '" font-size="28">' + GLYPH.whole + '</text></g>';
+      o += g;
+    });
+    return o + '</svg>';
+  }
+  function stageStaff(k){ if (q && (q.stage || 0) < k){ q.stage = k; renderStaff(); } }
+  // put the start note on the staff when it's heard -- its own timer, since seqClear() cancels the chip timers
+  function stageAt(t, k){
+    var cq = q;
+    setTimeout(function(){ if (q === cq && started) stageStaff(k); }, Math.max(0, (t + outLat() - audio.ctx.currentTime) * 1000));
+  }
+
+  /* --- the sequence strip: a chip for each sound, lit as it plays --- */
+  var seqTimers = [];
+  function seqClear(){ seqTimers.forEach(clearTimeout); seqTimers = []; $('seq').innerHTML = ''; }
+  function atTime(t, fn){ seqTimers.push(setTimeout(fn, Math.max(0, (t + outLat() - audio.ctx.currentTime) * 1000))); }   // when it's heard
+  // items: [{ big, small, at, end, cls }] -- times on the audio clock
+  function seqShow(items){
+    seqClear();
+    var box = $('seq');
+    items.forEach(function(it, i){
+      var g = document.createElement('span'); g.className = 'sg';       // arrow + chip wrap together
+      if (i){ var a = document.createElement('span'); a.className = 'arr'; a.textContent = '→'; g.appendChild(a); }
+      var c = document.createElement('span'); c.className = 'chip ' + (it.cls || '');
+      c.innerHTML = '<b>' + it.big + '</b><small>' + (it.small || '&nbsp;') + '</small>';
+      g.appendChild(c); box.appendChild(g); it.el = c;
+      atTime(it.at, function(){ items.forEach(function(o){ if (o.el) o.el.classList.remove('now'); }); c.classList.add('seen', 'now'); });
+      if (it.end) atTime(it.end, function(){ c.classList.remove('now'); });
+    });
+    return items;
+  }
+  function chipNote(m, extra){ return { big: solfa(m), small: spell(m) + (extra ? ' · ' + extra : '') }; }
+
+  // I–IV–V⁷–I in close position over a bass, do in the bass between F2 and E3; returns when it ends
+  function playKey(at){
+    ensureCtx();
+    var t = at || audio.ctx.currentTime + 0.05, b = 41 + ((settings.key - 5 + 12) % 12), u = b + 12;
+    // V7 = sol in the bass, fa–sol–ti above: fa holds over from IV and falls to mi, ti rises to do
+    var chords = [[b, u+4, u+7, u+12], [b+5, u+5, u+9, u+12], [b-5, u+5, u+7, u+11], [b, u+4, u+7, u+12]];
+    var lens = [0.62, 0.62, 0.62, 1.3];
+    chords.forEach(function(ch, i){
+      ch.forEach(function(m){ playNote(m, t, lens[i] - 0.06, 0.42); });
+      t += lens[i];
+    });
+    return t + 0.15;
+  }
+  function replayKey(){                          // the ▶ Key button / K: just the cadence
+    if (!sf()) return;
+    ensureCtx(); stopAllSound();
+    var t0 = audio.ctx.currentTime + 0.05, end = playKey(t0);
+    seqShow([{ big: 'I–IV–V⁷–I', small: 'key', at: t0, end: end }]);
+    if (q && mode === 'sing' && phase !== 'graded') beginListening(end + 0.35);
+  }
+  // Solfège intro: [cadence] → do → the starting note, each on its own chip. Returns { t: time the start note ends, items }.
+  function solfaIntro(withKey){
+    ensureCtx();
+    var t = audio.ctx.currentTime + 0.05, items = [];
+    if (withKey){ var e = playKey(t); items.push({ big: 'I–IV–V⁷–I', small: 'key', at: t, end: e - 0.15 }); t = e + 0.2; needKey = false; }
+    var d = doBelow(q.ref);
+    if (d !== q.ref){
+      playNote(d, t, 0.85);
+      items.push({ big: 'do', small: spell(d), at: t, end: t + 0.9 }); t += 1.1;
+      playNote(q.ref, t, 1.1);
+      items.push(Object.assign(chipNote(q.ref, 'start'), { at: t, end: t + 1.1, startNote: 1 }));
+    } else {
+      playNote(q.ref, t, 1.1);
+      items.push(Object.assign(chipNote(q.ref, 'start'), { at: t, end: t + 1.1, startNote: 1 }));
+    }
+    return { t: t + 1.1, start: t, items: items };
+  }
+  function showSingPrompt(){
+    $('ask').innerHTML = 'Sing <em>' + solfa(q.target) + '</em> <span class="ivl">(' + intervalName(q.semi) + ' ' + (q.semi > 0 ? 'above ' : 'below ') + solfa(q.ref) + ')</span>';
+  }
+  function playReference(){
+    if (!q) return;
+    ensureCtx();
+    if (sf()){
+      var cur = q, intro = solfaIntro(needKey || settings.keyEvery);
+      intro.items.push({ big: solfa(q.target), small: 'sing', at: intro.t + 0.1, cls: 'target' });
+      seqShow(intro.items);
+      stageIntro(intro.items, cur);
+      atTime(intro.start + 0.5, function(){ if (q === cur) showSingPrompt(); });
+      beginListening(intro.t + 0.35);
+      return;
+    }
+    var now = audio.ctx.currentTime + 0.05;
+    playNote(q.ref, now, 1.1);
+    stageAt(now, 2);                                             // the start note goes on the staff as it sounds
+    beginListening(now + 1.1 + 0.35);
+  }
+  function playAnswer(){
+    if (!q) return;
+    ensureCtx();
+    if (!q.rec) q.helped = true;                 // heard it before singing: doesn't count toward accuracy
+    var now = audio.ctx.currentTime + 0.05;
+    playNote(q.ref, now, 0.8);
+    playNote(q.target, now + 0.9, 1.1);
+    if (sf()){
+      showSingPrompt();
+      seqShow([Object.assign(chipNote(q.ref, 'start'), { at: now, end: now + 0.85 }),
+               Object.assign(chipNote(q.target, 'answer'), { at: now + 0.9, end: now + 2, cls: 'target' })]);
+    }
+    var cur = q;
+    setTimeout(function(){ if (q === cur){ q.heard = true; q.stage = Math.max(q.stage || 0, 2); renderStaff(); } }, Math.max(0, (now + 0.9 + outLat() - audio.ctx.currentTime) * 1000));
+    beginListening(now + 0.9 + 1.1 + 0.35);
+  }
+  function playPair(ref, target){
+    ensureCtx();
+    var now = audio.ctx.currentTime + 0.05;
+    if (settings.play === 'harmonic'){ playNote(ref, now, 1.6); playNote(target, now, 1.6); }
+    else { playNote(ref, now, 0.85); playNote(target, now + 0.95, 1.2); }
+    return now;
+  }
+  function playQuestion(){
+    if (!q) return;
+    if (!sf()){ stageAt(playPair(q.ref, q.target), 2); return; }
+    // Name it · Solfège: [cadence] → do → start → the mystery note (or both together, if harmonic)
+    var cur = q, intro = solfaIntro(needKey || settings.keyEvery), t = intro.t + 0.1, harm = settings.play === 'harmonic';
+    if (harm){ playNote(q.ref, t, 1.6); playNote(q.target, t, 1.6); }
+    else playNote(q.target, t, 1.2);
+    intro.items.push({ big: q.answered ? solfa(q.target) : '?', small: q.answered ? spell(q.target) : (harm ? 'with the start' : 'which?'),
+                       at: t, end: t + 1.3, cls: 'target' });
+    seqShow(intro.items);
+    stageIntro(intro.items, cur);
+    atTime(intro.start + 0.5, function(){ if (q === cur && !q.answered) $('ask').innerHTML = 'Which syllable is the last note?'; });
+  }
+  function stageIntro(items, cur){                          // put do, then the start note, on the staff as they sound
+    items.forEach(function(it){
+      if (it.big === 'do' && !it.startNote) atTime(it.at, function(){ if (q === cur) stageStaff(1); });
+      if (it.startNote) atTime(it.at, function(){ if (q === cur) stageStaff(2); });
+    });
+  }
+  function beginListening(at){
+    if (!singing()) return;
+    phase = 'prompting'; listenFrom = at + outLat(); run = [];
+    $('progress').style.width = '0';
+    updateButtons();
+  }
+  function retry(){
+    if (!q || !singing()) return;
+    ensureCtx();
+    $('result').innerHTML = ''; q.sung = null; renderStaff();
+    beginListening(audio.ctx.currentTime);
+  }
+
+  /* --- Name it: the answer buttons --- */
+  function buildAnswers(){
+    var box = $('answers'); box.innerHTML = '';
+    if (sf()){                                   // syllable buttons, in scale order
+      var degs = settings.solfaChrom ? [0,1,2,3,4,5,6,7,8,9,10,11] : [0,2,4,5,7,9,11];
+      if (q && degs.indexOf(degOf(q.target)) < 0){ degs.push(degOf(q.target)); degs.sort(function(a, b){ return a - b; }); }
+      degs.forEach(function(d){
+        var b = document.createElement('button'); b.type = 'button'; b.dataset.deg = d;
+        b.innerHTML = '<b>' + SOLFA[d][0] + '</b><span>' + pcName(d) + '</span>';
+        b.addEventListener('click', function(){ tapSolfa(d, b); });
+        box.appendChild(b);
+      });
+      return;
+    }
+    var pool = settings.ivals.length >= 2 ? settings.ivals.slice() : INTERVALS.map(function(i){ return i.semi; });
+    if (q && pool.indexOf(Math.abs(q.semi)) < 0) pool.push(Math.abs(q.semi));
+    pool.sort(function(a, b){ return a - b; });
+    pool.forEach(function(semi){
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.semi = semi;
+      b.innerHTML = '<b>' + intervalShort(semi) + '</b><span>' + intervalName(semi) + '</span>';
+      b.addEventListener('click', function(){ tapAnswer(semi, b); });
+      box.appendChild(b);
+    });
+  }
+  function tapAnswer(semi, btn){
+    if (!q) return;
+    ensureCtx();
+    var sign = q.semi < 0 ? -1 : 1;
+    if (q.answered){                              // after answering, a tap plays that interval for comparison
+      playPair(q.ref, q.ref + sign * semi);
+      return;
+    }
+    q.answered = true;
+    var right = Math.abs(q.semi), ok = semi === right;
+    q.gotIt = ok; q.stage = Math.max(q.stage || 0, 2); stageStaff(3);
+    record({ t: Date.now(), m: 'tap', s: q.semi, ok: ok, g: ok ? undefined : semi });
+    flash(ok);
+    $('answers').querySelectorAll('button').forEach(function(b){
+      if (+b.dataset.semi === right) b.classList.add('right');
+    });
+    var dirWord = q.semi > 0 ? 'up' : 'down', res = $('tapResult');
+    var sp = ivSpell(q.ref, q.semi), from = settings.play === 'harmonic' ? (q.semi < 0 ? sp.tgt + ' and ' + sp.ref : sp.ref + ' and ' + sp.tgt)
+                                                                         : sp.ref + ' → ' + sp.tgt;
+    if (ok){
+      res.className = 'result ok';
+      res.innerHTML = '✓ ' + intervalName(right) + (settings.play === 'harmonic' ? '' : ' ' + dirWord) +
+        '<small>' + from + (settings.autoNext ? '' : ' · Tap any interval to hear it from the same note.') + '</small>';
+      scheduleNext();
+    } else {
+      btn.classList.add('wrong');
+      res.className = 'result bad';
+      res.innerHTML = '✗ It was ' + aIntervalName(right) + (settings.play === 'harmonic' ? '' : ' ' + dirWord) + ', not ' + aIntervalName(semi) +
+        '<small>' + from + ' · Tap any interval to hear it from the same note and compare.</small>';
+      playQuestion();
+    }
+    updateButtons();
+  }
+
+  function tapSolfa(deg, btn){
+    if (!q) return;
+    ensureCtx();
+    var sign = q.semi < 0 ? -1 : 1;
+    var d = ((deg - degOf(q.ref)) % 12 + 12) % 12, gAbs = sign > 0 ? (d || 12) : (12 - d);   // that syllable, the same way from the start note
+    if (q.answered){ playPair(q.ref, q.ref + sign * gAbs); return; }   // after answering: hear any syllable from the start note
+    q.answered = true;
+    var right = degOf(q.target), ok = deg === right;
+    q.gotIt = ok; q.stage = Math.max(q.stage || 0, 2); stageStaff(3);
+    record({ t: Date.now(), m: 'tapsolfa', s: q.semi, ok: ok, g: ok ? undefined : gAbs, k: settings.key, ts: solfa(q.target) });
+    flash(ok);
+    $('answers').querySelectorAll('button').forEach(function(b){ if (+b.dataset.deg === right) b.classList.add('right'); });
+    var last = $('seq').querySelector('.chip.target');
+    if (last){ last.innerHTML = '<b>' + solfa(q.target) + '</b><small>' + spell(q.target) + '</small>'; last.classList.add('seen'); }
+    $('ask').innerHTML = 'It was <em>' + solfa(q.target) + '</em>';
+    var how = aIntervalName(q.semi) + ' ' + (q.semi > 0 ? 'above' : 'below') + ' ' + solfa(q.ref), res = $('tapResult');
+    var path = lbl(q.ref) + ' → ' + lbl(q.target);
+    if (ok){
+      res.className = 'result ok';
+      res.innerHTML = '✓ ' + solfa(q.target) + ' — ' + how + '<small>' + path + (settings.autoNext ? '' : ' · Tap any syllable to hear it from ' + solfa(q.ref) + '.') + '</small>';
+      scheduleNext();
+    } else {
+      btn.classList.add('wrong');
+      res.className = 'result bad';
+      res.innerHTML = '✗ It was ' + solfa(q.target) + ', not ' + SOLFA[deg][0] + '<small>' + how + ' · ' + path + ' · Tap any syllable to hear it from ' + solfa(q.ref) + ' and compare.</small>';
+      playPair(q.ref, q.target);
+    }
+    updateButtons();
+  }
+
+  /* --- Sing: grading ---
+   * A "run" is a stretch of confidently pitched frames that stay within 60 cents of their own
+   * median. The first 150 ms of a run (the scoop into the note) is ignored; once the rest has
+   * lasted the chosen hold time, the median of it is the note you sang. */
+  var CLARITY = 0.80, ONSET = 0.15, STABLE_CENTS = 60;
+  function median(arr){ var s = arr.slice().sort(function(a, b){ return a - b; }); var n = s.length; return n ? (n % 2 ? s[(n-1)/2] : (s[n/2-1] + s[n/2]) / 2) : 0; }
+  function offTarget(midi){
+    var err = midi - q.target;
+    if (settings.anyOct) err -= 12 * Math.round(err / 12);
+    return err * 100;
+  }
+  function feedRun(t, midi){
+    if (midi == null){ run = []; return; }
+    if (run.length){
+      var med = median(run.map(function(r){ return r.midi; }));
+      if (Math.abs(midi - med) * 100 > STABLE_CENTS) run = [];
+    }
+    run.push({ t: t, midi: midi });
+    var body = run.filter(function(r){ return r.t - run[0].t >= ONSET; });
+    var held = body.length ? (t - body[0].t) : 0;
+    $('progress').style.width = Math.min(100, held * 1000 / settings.hold * 100) + '%';
+    if (held * 1000 >= settings.hold) grade(median(body.map(function(r){ return r.midi; })));
+  }
+  function grade(sung){
+    phase = 'graded';
+    var cents = offTarget(sung), ok = Math.abs(cents) <= settings.tol;
+    var c = Math.round(cents), cTxt = (c > 0 ? '+' : c < 0 ? '−' : '±') + Math.abs(c) + '¢';
+    var actual = Math.round(sung - q.ref);
+    var first = !q.rec;
+    if (first){
+      q.rec = { t: Date.now(), m: sf() ? 'solfa' : 'sing', s: q.semi, ok: ok && !q.helped, c: c };
+      if (sf()){ q.rec.k = settings.key; q.rec.ts = solfa(q.target); }
+      if (!ok && Math.abs(cents) >= 50) q.rec.g = actual;
+      if (q.helped) q.rec.h = 1;
+      record(q.rec);
+    } else {
+      q.rec.r = (q.rec.r || 0) + 1;
+      if (ok) q.rec.fix = 1;
+      save(); renderStats();
+    }
+    q.sung = Math.round(sung); q.sungOk = ok; q.stage = Math.max(q.stage || 0, 2); renderStaff();
+    noteTry(sung, cents, ok, first);
+    var res = $('result');
+    flash(ok);
+    if (ok){
+      res.className = 'result ok';
+      var note = Math.abs(c) <= 8 ? 'Right in the middle.' : (c > 0 ? 'A touch sharp, but good.' : 'A touch flat, but good.');
+      if (!first) note += ' (Got it on a retry.)';
+      else if (q.helped) note += ' (You heard the answer first, so it isn’t counted as right.)';
+      res.innerHTML = '✓ ' + (sf() ? solfa(sung) : noteName(sung)) + ' ' + cTxt + '<small>' + note + ' Tap <b>Next</b> for another.</small>';
+      if (first && !q.helped) scheduleNext();
+    } else {
+      var what = Math.abs(cents) < 100
+        ? (cents > 0 ? 'sharp' : 'flat') + ' by ' + Math.abs(c) + ' cents'
+        : sf()
+          ? 'you sang ' + lbl(sung) + ', ' + aIntervalName(actual) + (actual === 0 ? '' : (actual > 0 ? ' above ' : ' below ')) + solfa(q.ref)
+          : 'that was ' + aIntervalName(actual) + (actual === 0 ? '' : (actual > 0 ? ' above' : ' below')) + ' (' + noteName(sung) + ')';
+      res.className = 'result bad';
+      res.innerHTML = '✗ ' + (sf() ? solfa(sung) : noteName(sung)) + ' ' + (Math.abs(cents) < 100 ? cTxt : '') + '<small>The target was ' + lbl(q.target) + ' — ' + what + '. <b>Hear answer</b>, or <b>Try again</b>.</small>';
+    }
+    updateButtons();
+  }
+
+  /* =========================================================================
+   * STATS
+   * ========================================================================= */
+  function record(e){
+    log.push(e);
+    if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+    save(); renderStats();
+  }
+  function startOfToday(){ var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function filtered(){
+    var from = settings.scope === 'session' ? sessionStart : settings.scope === 'today' ? startOfToday() : -Infinity;
+    var KIND = { sing: ['sing','solfa'], tap: ['tap','tapsolfa'], solfa: ['solfa','tapsolfa'] }[settings.kind];
+    return log.filter(function(e){ return e.t >= from && (!KIND || KIND.indexOf(e.m) >= 0); });
+  }
+  function pct(ok, n){ return n ? Math.round(100 * ok / n) : null; }
+  function fmtDate(t){ var d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+  function fmtTime(t){ var d = new Date(t); return d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function renderStats(){
+    ['scopeSeg','kindSeg'].forEach(function(id){
+      var key = id === 'scopeSeg' ? 'scope' : 'kind';
+      $(id).querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.v === settings[key]); });
+    });
+    var es = filtered(), n = es.length, ok = 0, streak = 0, bestStreak = 0, cur = 0, cSum = 0, cN = 0;
+    es.forEach(function(e){
+      if (e.ok){ ok++; cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0;
+      if ((e.m === 'sing' || e.m === 'solfa') && e.c != null && !e.h){ cSum += Math.abs(e.c); cN++; }
+    });
+    streak = cur;
+    var acc = pct(ok, n);
+    function tile(v, k, s){ return '<div class="tile"><div class="v">' + v + '</div><div class="k">' + k + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
+    $('tiles').innerHTML =
+      tile(n, 'Trials') + tile(ok, 'Right') + tile(acc == null ? '–' : acc + '%', 'Accuracy') +
+      tile(streak, 'Streak', 'best ' + bestStreak) + tile(cN ? Math.round(cSum / cN) + '¢' : '–', 'Avg. off', cN ? 'when sung' : '');
+
+    // recent results, oldest to newest
+    var recent = es.filter(function(e){ return e.t > 0; }).slice(-40), rb = $('recent'); rb.innerHTML = '';
+    recent.forEach(function(e){
+      var i = document.createElement('i');
+      if (e.h) i.className = 'h'; else if (e.ok) i.className = 'ok';
+      i.title = intervalShort(e.s) + (e.s > 0 ? ' ↑ ' : ' ↓ ') + ({ sing: 'sung ', solfa: 'sung ', tap: 'named ', tapsolfa: 'named ' }[e.m] || '') + (e.ts ? e.ts + ' ' : '') + (e.ok ? '✓' : '✗') +
+        ((e.m === 'sing' || e.m === 'solfa') && e.c != null ? ' ' + (e.c > 0 ? '+' : '') + e.c + '¢' : '') + (e.h ? ' (heard answer)' : '') + (e.fix ? ' (right on retry)' : '') + ' · ' + fmtTime(e.t);
+      rb.appendChild(i);
+    });
+
+    // per interval
+    var by = {};
+    es.forEach(function(e){
+      var k = (e.s > 0 ? 'u' : 'd') + Math.abs(e.s);
+      var s = by[k] || (by[k] = { semi: e.s, n: 0, ok: 0, cSum: 0, cN: 0, mix: {} });
+      s.n++; if (e.ok) s.ok++;
+      if ((e.m === 'sing' || e.m === 'solfa') && e.c != null && !e.h){ s.cSum += Math.abs(e.c); s.cN++; }
+      if (!e.ok && e.g != null){ var gk = Math.abs(e.g); s.mix[gk] = (s.mix[gk] || 0) + 1; }
+    });
+    var keys = Object.keys(by).sort(function(a, b){ return (Math.abs(by[a].semi) - Math.abs(by[b].semi)) || (by[b].semi - by[a].semi); });
+    var tb = $('stats');
+    if (!keys.length){
+      tb.innerHTML = '<tr><td style="color:var(--text-dim)">' + (log.length ? 'Nothing here yet for this view.' : 'Nothing answered yet.') + '</td></tr>';
+    } else {
+      var html = '<tr><th>Interval</th><th>Trials</th><th style="text-align:left">Right</th><th>Avg. off</th><th class="opt">Mixed up with</th></tr>';
+      keys.forEach(function(k){
+        var s = by[k], p = pct(s.ok, s.n);
+        var mix = Object.keys(s.mix).sort(function(a, b){ return s.mix[b] - s.mix[a]; }).slice(0, 2)
+          .map(function(g){ return intervalShort(+g) + (s.mix[g] > 1 ? ' ×' + s.mix[g] : ''); }).join(', ');
+        html += '<tr><td>' + intervalName(s.semi) + ' ' + (s.semi > 0 ? '↑' : '↓') + '</td><td>' + s.n + '</td>' +
+          '<td style="text-align:left;white-space:nowrap"><span class="barbox"><span class="bar" style="width:' + p + '%"></span></span>' + p + '%</td>' +
+          '<td>' + (s.cN ? Math.round(s.cSum / s.cN) + '¢' : '–') + '</td><td class="mix opt">' + (mix || '') + '</td></tr>';
+      });
+      tb.innerHTML = html;
+    }
+
+    // footnote
+    var foot = '';
+    if (settings.scope === 'all'){
+      var days = {}, firstT = 0, oldN = 0;
+      log.forEach(function(e){ if (e.t > 0){ days[new Date(e.t).toDateString()] = 1; if (!firstT || e.t < firstT) firstT = e.t; } else oldN++; });
+      var dn = Object.keys(days).length;
+      if (dn) foot = 'Practiced on ' + dn + ' day' + (dn === 1 ? '' : 's') + ' since ' + fmtDate(firstT) + '.';
+      if (oldN) foot += ' Includes ' + oldN + ' undated trial' + (oldN === 1 ? '' : 's') + ' from version 0.1.';
+    } else if (settings.scope === 'session'){
+      foot = 'Since you opened this page at ' + fmtTime(sessionStart) + '.';
+    }
+    foot += (foot ? ' ' : '') + 'Kept in this browser on this device only.';
+    $('statsFoot').textContent = foot;
+  }
+  function exportCSV(){
+    var rows = [['date','time','mode','interval','direction','semitones','right','cents_off','answered_or_sang','heard_answer_first','retries','right_on_retry','key','solfege_target']];
+    log.forEach(function(e){
+      rows.push([e.t ? fmtDate(e.t) : '', e.t ? fmtTime(e.t) : '', { sing: 'sung', solfa: 'sung (solfège)', tap: 'named', tapsolfa: 'named (solfège)' }[e.m] || e.m, intervalName(e.s), e.s > 0 ? 'up' : 'down',
+        Math.abs(e.s), e.ok ? 'yes' : 'no', e.c != null ? e.c : '', e.g != null ? intervalName(e.g) : '', e.h ? 'yes' : '', e.r || '', e.fix ? 'yes' : '', e.k != null ? KEYS[e.k] + ' major' : '', e.ts || '']);
+    });
+    var csv = rows.map(function(r){ return r.map(function(v){ v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+    var blob = new Blob([csv], { type: 'text/csv' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    var d = new Date();
+    a.href = url; a.download = 'intervals-' + d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  function wireSeg(id, key){
+    $(id).addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return;
+      settings[key] = b.dataset.v; save(); renderStats();
+    });
+  }
+  wireSeg('scopeSeg', 'scope'); wireSeg('kindSeg', 'kind');
+
+  /* =========================================================================
+   * BUTTONS, KEYS, MODES
+   * ========================================================================= */
+  function updateButtons(){
+    var sing = singing(), tap = mode === 'tap', tuner = mode === 'tuner';
+    $('keyBtn').classList.toggle('hidden', !started || !sf());
+    $('keyRow').classList.toggle('hidden', !sf()); $('keyScale').classList.toggle('hidden', !sf());
+    $('drillOpts').classList.toggle('hidden', tuner);
+    var showStaff = !tuner && started;
+    $('staffBox').parentNode.classList.toggle('solo', !tap);
+    if (showStaff !== !$('staffBox').classList.contains('hidden')){ $('staffBox').classList.toggle('hidden', !showStaff); renderStaff(); }
+    $('styleSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', (+b.dataset.v === 1) === !!settings.solfa); });
+    $('dirSeg').querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.v === settings.dir); });
+    if (!sf() || tuner) seqClear();
+    $('startBtn').classList.toggle('hidden', started);
+    $('startBtn').disabled = false;
+    $('stopBtn').classList.toggle('hidden', !started);
+    $('refBtn').classList.toggle('hidden', !started || (tuner && tunerTarget() == null));
+    $('nextBtn').classList.toggle('hidden', !started || tuner);
+    $('answerBtn').classList.toggle('hidden', !started || !sing);
+    $('retryBtn').classList.toggle('hidden', !started || !sing);
+    $('refBtn').textContent = tap ? '▶ Play again' : sing && sf() ? '▶ do + start' : tuner ? '▶ Play ' + (tunerTarget() != null ? noteName(tunerTarget()) : 'note') : '▶ Reference';
+    $('refBtn').disabled = tuner ? tunerTarget() == null : !q;
+    $('answerBtn').disabled = !q;
+    $('retryBtn').disabled = !q || phase === 'listening' || phase === 'prompting';
+    $('nextBtn').disabled = !started;
+    $('answers').classList.toggle('hidden', !tap || !started);
+    $('tunerPick').classList.toggle('hidden', !tuner);
+    $('keyHint').innerHTML = sing ? (sf() ? '<kbd>K</kbd> key · ' : '') + '<kbd>Space</kbd> ' + (sf() ? 'do + start' : 'reference') + ' · <kbd>A</kbd> answer · <kbd>R</kbd> try again · <kbd>Enter</kbd> next · <kbd>Esc</kbd> stop'
+                          : tap ? (sf() ? '<kbd>K</kbd> key · ' : '') + '<kbd>Space</kbd> play again · <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd> answer by position · <kbd>Enter</kbd> next · <kbd>Esc</kbd> stop'
+                                : '<kbd>Space</kbd> play the target · <kbd>Esc</kbd> stop';
+    $('keyHint').innerHTML += ' · <kbd>?</kbd> help';
+  }
+
+  /* --- tuner target --- */
+  // The Tuner offers every note in one voice part's range. That range starts as your voice in
+  // Settings each time you open the Tuner; the Vocal range menu changes it for this visit only.
+  var tunerVoice = settings.voice;
+  function tunerRange(){ return VOICES[tunerVoice] || VOICES.A; }
+  function tunerTarget(){ return settings.tunerNote == null ? null : settings.tunerNote; }
+  function fitTunerNote(){                        // keep the chosen note's name, moved by octaves into the range
+    if (settings.tunerNote == null) return;
+    var v = tunerRange(), n = settings.tunerNote;
+    while (n < v.lo) n += 12;
+    while (n > v.hi) n -= 12;
+    settings.tunerNote = n >= v.lo ? n : null;
+  }
+  function buildTunerPick(){
+    var box = $('tunerNotes'), v = tunerRange(); box.innerHTML = '';
+    var any = document.createElement('button'); any.type = 'button'; any.className = 'any'; any.textContent = 'Any note';
+    any.classList.toggle('on', settings.tunerNote == null);
+    any.addEventListener('click', function(){ settings.tunerNote = null; save(); tunerChanged(false); });
+    box.appendChild(any);
+    for (var m = v.lo; m <= v.hi; m++) (function(m){
+      var nm = noteName(m), b = document.createElement('button'); b.type = 'button';
+      b.innerHTML = nm.replace(/(-?\d+)$/, '<small>$1</small>'); b.title = nm;
+      b.classList.toggle('on', settings.tunerNote === m);
+      b.addEventListener('click', function(){ settings.tunerNote = m; save(); tunerChanged(true); });
+      box.appendChild(b);
+    })(m);
+    $('tvLab').textContent = v.label;
+    $('tvRange').textContent = noteName(v.lo) + '–' + noteName(v.hi);
+    $('tvStaff').innerHTML = rangeStaff(tunerVoice, settings.tunerNote);
+    var menu = $('tvMenu'); menu.innerHTML = '';
+    Object.keys(VOICES).forEach(function(k){
+      var it = document.createElement('button'); it.type = 'button'; it.setAttribute('role', 'menuitemradio');
+      it.setAttribute('aria-checked', k === tunerVoice ? 'true' : 'false'); it.classList.toggle('on', k === tunerVoice);
+      it.innerHTML = '<b>' + VOICES[k].label + '</b>' + rangeStaff(k, k === tunerVoice ? settings.tunerNote : null) +
+        '<span>' + noteName(VOICES[k].lo) + '–' + noteName(VOICES[k].hi) + '</span>' + (k === settings.voice ? '<em>your voice</em>' : '<em>&nbsp;</em>');
+      it.addEventListener('click', function(){
+        tunerVoice = k; fitTunerNote(); save(); closeTvMenu(true);
+        tunerChanged(settings.tunerNote != null && started);
+        console.log('*** tuner range ->', k);
+      });
+      menu.appendChild(it);
+    });
+  }
+  function tvMenuOpen(){ return !$('tvMenu').classList.contains('hidden'); }
+  function openTvMenu(){
+    $('tvMenu').classList.remove('hidden'); $('tvBtn').setAttribute('aria-expanded', 'true');
+    var on = $('tvMenu').querySelector('.on'); if (on) on.focus();
+  }
+  function closeTvMenu(refocus){
+    if (!tvMenuOpen()) return;
+    $('tvMenu').classList.add('hidden'); $('tvBtn').setAttribute('aria-expanded', 'false');
+    if (refocus) $('tvBtn').focus();
+  }
+  $('tvBtn').addEventListener('click', function(){ if (tvMenuOpen()) closeTvMenu(); else openTvMenu(); });
+  document.addEventListener('pointerdown', function(e){ if (tvMenuOpen() && !e.target.closest('.tvoice')) closeTvMenu(); });
+  function tunerChanged(play){
+    buildTunerPick(); tunerPrompt(); updateButtons(); $('result').innerHTML = '';
+    if (play) playTarget();
+  }
+  function playTarget(){
+    var t = tunerTarget(); if (t == null || !audio.ctx) return;
+    ensureCtx(); stopAllSound();
+    playNote(t, audio.ctx.currentTime + 0.05, 1.6);
+    listenFrom = audio.ctx.currentTime + 0.05 + 1.6 + 0.35 + outLat();    // don't grade the piano
+    tun.frames = []; tun.quietSince = null;
+  }
+  function tunerPrompt(){
+    if (mode !== 'tuner') return;
+    var t = tunerTarget();
+    $('ask').innerHTML = t == null ? 'Tuner' : 'Sing <em>' + noteName(t) + '</em>';
+    $('refLine').innerHTML = t == null ? 'Sing any note: it shows which note you’re on and how sharp or flat. Or pick a note to aim for.'
+                                       : midiToHz(t).toFixed(1) + ' Hz · tap <b>Play</b> to hear it, then sing and hold it';
+  }
+
+  /* --- Sing: the session report (Stop after singing) ---
+   * One item per question sung since Start: what was asked, then every graded try (first and retries). */
+  var sess = null;                 // { t0, items: [{ ask, target, tries: [{ c, ok, name, far }], helped }] }
+  var FAR = 100;                   // a try this many cents off (or more) was a different note: named, not plotted
+  function noteTry(sung, cents, ok, first){
+    if (!q) return;
+    if (!sess) sess = { t0: Date.now(), items: [] };
+    if (first || !q.sItem){
+      var it = { helped: !!q.helped, tries: [] };
+      if (sf()) {
+        it.ask = '<b>' + solfa(q.target) + '</b> <span class="dim">' + intervalShort(q.semi) + arrowOf(q.semi) + ' from ' + solfa(q.ref) + ' · ' + KEYS[settings.key] + '</span>';
+        it.target = spell(q.target);
+      } else {
+        var sp = ivSpell(q.ref, q.semi);
+        it.ask = '<b>' + intervalShort(q.semi) + arrowOf(q.semi) + '</b> <span class="dim">' + sp.ref + ' → ' + sp.tgt + '</span>';
+        it.target = sp.tgt;
+      }
+      q.sItem = it; sess.items.push(it);
+    }
+    var r = Math.round(sung), far = Math.abs(cents) >= FAR, name;
+    if (sf()) name = solfa(r) + ' (' + spell(r) + ')';
+    else { var ds = r - q.ref; name = ivSpell(q.ref, ds).tgt + ' (' + intervalShort(ds) + arrowOf(ds) + ')'; }
+    q.sItem.tries.push({ c: Math.round(cents), ok: ok, far: far, name: name });
+  }
+  function stopAndReport(){
+    var s = sess;
+    stop();
+    if (s && s.items.length && settings.report !== false) showReport(s);
+  }
+  function centsTxt(c){ return (c > 0 ? '+' : c < 0 ? '−' : '±') + Math.abs(c) + '¢'; }
+  function showReport(s){
+    var items = s.items, firsts = items.map(function(it){ return it.tries[0]; });
+    var n = items.length, right = items.filter(function(it){ return it.tries[0].ok && !it.helped; }).length;
+    var near = firsts.filter(function(t){ return !t.far; });
+    var avgAbs = near.length ? Math.round(near.reduce(function(a, t){ return a + Math.abs(t.c); }, 0) / near.length) : null;
+    var avgSig = near.length ? Math.round(near.reduce(function(a, t){ return a + t.c; }, 0) / near.length) : null;
+    var wrongNote = firsts.length - near.length, mins = Math.max(1, Math.round((Date.now() - s.t0) / 60000));
+    var tol = settings.tol, o = '';
+    o += '<div class="rtiles">';
+    o += '<div><b>' + n + '</b><span>question' + (n === 1 ? '' : 's') + ' · ' + mins + ' min</span></div>';
+    o += '<div><b>' + right + '/' + n + '</b><span>right first time (' + Math.round(right / n * 100) + '%)</span></div>';
+    o += '<div><b>' + (avgAbs == null ? '–' : avgAbs + '¢') + '</b><span>average off, first tries</span></div>';
+    o += '<div><b>' + (avgSig == null ? '–' : centsTxt(avgSig)) + '</b><span>' + (avgSig == null ? 'lean' : Math.abs(avgSig) < 5 ? 'no lean — centred' : 'you lean ' + (avgSig > 0 ? 'sharp' : 'flat')) + '</span></div>';
+    o += '</div>';
+    if (wrongNote) o += '<p class="dim">' + wrongNote + ' first ' + (wrongNote === 1 ? 'try was' : 'tries were') + ' a different note altogether (not counted in the averages).</p>';
+    o += '<div class="rrow rscale"><div class="rtop"><span>flat</span><span>sharp</span></div><div class="rbar"><i class="rband" style="left:' + (50 - tol / 2) + '%;width:' + tol + '%"></i><i class="rmid"></i>' +
+         '<em style="left:0">−100</em><em style="left:25%">−50</em><em style="left:50%">0</em><em style="left:75%">+50</em><em style="left:100%">+100</em></div></div>';
+    items.forEach(function(it, i){
+      var f = it.tries[0], rest = it.tries.slice(1), res;
+      if (f.ok) res = '<span class="rok">✓ ' + centsTxt(f.c) + '</span>';
+      else if (f.far) res = '<span class="rbad">✗ sang ' + f.name + '</span>';
+      else res = '<span class="rbad">✗ ' + centsTxt(f.c) + ' ' + (f.c > 0 ? 'sharp' : 'flat') + '</span>';
+      if (rest.length){
+        var fix = rest.filter(function(t){ return t.ok; })[0];
+        res += '<small>' + rest.length + ' retr' + (rest.length === 1 ? 'y' : 'ies') + (fix ? ' · got it (' + centsTxt(fix.c) + ')' : '') + '</small>';
+      }
+      if (it.helped) res += '<small>heard the answer first</small>';
+      var dots = '';
+      it.tries.forEach(function(t, j){
+        var c = Math.max(-100, Math.min(100, t.c));
+        var cls = (j ? 'rd retry ' : 'rd ') + (t.ok ? 'ok' : 'bad') + (t.far ? ' far' : '');
+        dots += '<i class="' + cls + '" style="left:' + ((c + 100) / 2) + '%" title="' + (j ? 'retry ' + j : 'first try') + ': ' + (t.far ? t.name : centsTxt(t.c)) + '"></i>';
+      });
+      o += '<div class="rrow"><div class="rtop"><span class="rq"><span class="rn">' + (i + 1) + '</span>' + it.ask + '</span><span class="rres">' + res + '</span></div>' +
+           '<div class="rbar"><i class="rband" style="left:' + (50 - tol / 2) + '%;width:' + tol + '%"></i><i class="rmid"></i>' + dots + '</div></div>';
+    });
+    o += '<p class="dim rkey">Each bar runs from 100 cents flat (left) to 100 cents sharp (right); the green band is your ±' + tol + '¢ “counts as right” zone. ' +
+         '<span class="rd ok inl"></span> first try &nbsp;<span class="rd retry ok inl"></span> a retry. A dot pinned to the end with a ring round it was a different note — named on the right.</p>';
+    $('repBody').innerHTML = o;
+    $('repSub').textContent = new Date(s.t0).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    openModal('rep', $('repDone'));
+  }
+
+  /* --- stop everything --- */
+  function stop(){
+    sess = null;
+    cancelNext();
+    stopAllSound();
+    stopMic();
+    seqClear(); avgReset();
+    started = false; phase = 'off'; q = null; run = []; trace = []; listenFrom = 0; clearTuner();
+    $('result').innerHTML = ''; $('result').className = 'result';
+    $('tapResult').innerHTML = ''; $('tapResult').className = 'result';
+    $('sungNote').textContent = '–'; $('sungHz').innerHTML = '&nbsp;'; $('needle').classList.add('off');
+    $('level').style.width = '0'; $('progress').style.width = '0'; $('micState').textContent = 'off';
+    if (mode === 'tuner') tunerPrompt(); else { $('ask').textContent = 'Ready when you are'; $('refLine').innerHTML = '&nbsp;'; }
+    idleStatus(); updateButtons(); drawTrace(0);
+    releaseAudio();
+  }
+  function micError(err){
+    $('startBtn').disabled = false;
+    if (err && err.message === 'insecure') setStatus('The microphone needs a secure page: open this over <b>https://</b> or <b>http://localhost</b>. <b>Name it</b> mode works without it.', true);
+    else if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) setStatus('Microphone permission was refused. ' + (ANDROID
+        ? 'On Android: tap the icon just left of the web address › <b>Permissions</b> (or Site settings) › <b>Microphone</b> › Allow, then reload. If it still won’t ask, check Settings › Apps › your browser › Permissions › Microphone.'
+        : 'On iPhone or iPad: Settings › Safari › Microphone (or the <b>aA</b> menu › Website Settings), allow it, then tap Start again.') + ' <b>Name it</b> mode works without it.', true);
+    else if (err && (err.name === 'NotReadableError' || err.name === 'AbortError' || err.name === 'TrackStartError')) setStatus('The microphone is busy — another app (a call, a voice recorder, a voice assistant) may be using it. Close that app and tap Start again. <b>Name it</b> mode works without the mic.', true);
+    else if (err && err.name === 'NotFoundError') setStatus('No microphone found. <b>Name it</b> mode works without one.', true);
+    else setStatus('Could not start: ' + (err && err.message ? err.message : err) + '. The piano needs intervals-piano-samples.json beside this file, served over http(s).', true);
+  }
+  function start(){
+    if (mode !== 'tap' && !settings.micChecked){ openMicCheck(start); return; }   // first sung exercise: check the mic first
+    ensureCtx(); needKey = true;                                    // inside the tap: unlocks audio on iOS
+    $('startBtn').disabled = true;
+    var needMic = mode !== 'tap';
+    (needMic ? ensureMic() : Promise.resolve()).then(loadPiano).then(function(){
+      started = true; phase = 'graded';
+      startedStatus(); keepAwake(); btNote();
+      if (!loopOn){ loopOn = true; requestAnimationFrame(tick); }
+      if (mode !== 'tuner') ask(); else { tunerPrompt(); updateButtons(); playTarget(); }
+      setTimeout(checkCtxState, 500);
+    }).catch(micError);
+  }
+  function startedStatus(){
+    if (mode === 'tap' && sf()) setStatus('Listen, then tap the syllable of the last note. <b>▶ Key</b> replays the cadence.');
+    else if (mode === 'tap') setStatus('Listen, then tap the interval you heard.');
+    else if (sf()) setStatus('Listening. Sing the syllable and hold it — the thin bar under the trace fills as you hold. <b>▶ Key</b> replays the cadence; changing the key starts afresh in the new one.');
+    else if (mode === 'sing') setStatus('Listening. Sing the interval and hold it — the thin bar under the trace fills as you hold. Watch the <b>Mic</b> bar move when you sing; if it says “too quiet”, raise <b>Boost</b>.');
+    else setStatus('Listening. Sing and hold a note; the big letter is what you’re singing.');
+  }
+  function setMode(m){
+    cancelNext();
+    stopAllSound();
+    closeTvMenu();
+    if (m === 'tuner' && mode !== 'tuner'){ tunerVoice = settings.voice; fitTunerNote(); buildTunerPick(); }   // the Tuner starts at your voice
+    mode = m;
+    if (m !== 'tuner'){ settings.mode = m; save(); }
+    $('modeSing').classList.toggle('on', m === 'sing'); $('modeTap').classList.toggle('on', m === 'tap'); $('modeTuner').classList.toggle('on', m === 'tuner');
+    $('readoutPanel').classList.toggle('hidden', m === 'tap');
+    $('progressWrap').classList.toggle('hidden', m !== 'sing');
+    $('meterCap').textContent = m === 'sing' ? 'cents from the target' : 'cents from the note';
+    needKey = true; seqClear(); avgReset();
+    $('result').innerHTML = ''; $('tapResult').innerHTML = '';
+    q = null; phase = started ? 'graded' : 'off'; listenFrom = 0; clearTuner();
+    if (m === 'tuner') tunerPrompt(); else { $('ask').textContent = 'Ready when you are'; $('refLine').innerHTML = '&nbsp;'; }
+    if (!started){ idleStatus(); updateButtons(); drawBand(); return; }
+    if (m !== 'tap' && !mic.analyser){
+      ensureCtx();
+      ensureMic().then(function(){ startedStatus(); btNote(); if (m === 'sing') ask(); else updateButtons(); }).catch(micError);
+    } else {
+      startedStatus();
+      if (m !== 'tuner') ask();
+    }
+    drawBand(); updateButtons();
+  }
+  $('modeSing').addEventListener('click', function(){ setMode('sing'); });
+  $('modeTap').addEventListener('click', function(){ setMode('tap'); });
+  // a fresh question in the current mode (key, style or direction changed mid-drill)
+  function restartDrill(keepKey){ cancelNext(); stopAllSound(); seqClear(); q = null; if (!keepKey) needKey = true; ask(); }
+  $('styleSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    settings.solfa = +b.dataset.v === 1; save(); needKey = true;
+    if (started && mode !== 'tuner') restartDrill(); else { idleStatus(); updateButtons(); drawTrace(0); }
+    if (started) startedStatus();
+  });
+  $('dirSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    settings.dir = b.dataset.v; save();
+    if (started && mode !== 'tuner') restartDrill(true); else updateButtons();
+  });
+  $('keyBtn').addEventListener('click', replayKey);
+  $('modeTuner').addEventListener('click', function(){ setMode('tuner'); });
+  $('startBtn').addEventListener('click', start);
+  $('refBtn').addEventListener('click', function(){ if (mode === 'tap') playQuestion(); else if (mode === 'tuner') playTarget(); else playReference(); });
+  $('stopBtn').addEventListener('click', stopAndReport);
+  $('answerBtn').addEventListener('click', playAnswer);
+  $('retryBtn').addEventListener('click', retry);
+  $('nextBtn').addEventListener('click', function(){ ensureCtx(); ask(); });
+  $('status').addEventListener('click', function(e){ if (e.target && e.target.id === 'restartMic') restartMic(); });
+  $('exportStats').addEventListener('click', exportCSV);
+  $('repClose').addEventListener('click', function(){ closeModal(); });
+  $('repDone').addEventListener('click', function(){ closeModal(); });
+  $('resetStats').addEventListener('click', function(){
+    if (confirm('Forget every result you have recorded on this device?')){ log = []; save(); renderStats(); }
+  });
+  /* --- Windows: Help, Settings, and the first-visit Welcome (one open at a time) --- */
+  var MODALS = { help: 'helpBack', set: 'setBack', wel: 'welBack', mic: 'micBack', rep: 'repBack' };
+  var modal = { name: null, ret: null, pushed: false, chainMic: false };
+  function helpIsOpen(){ return modal.name != null; }             // any window open (the drill keys stay off behind it)
+  function hideModal(name){
+    var back = $(MODALS[name]); back.classList.remove('open');
+    setTimeout(function(){ if (!back.classList.contains('open')) back.classList.add('hidden'); }, 180);
+  }
+  function openModal(name, focusEl){
+    if (modal.name === name) return;
+    closeTvMenu();
+    if (modal.name) hideModal(modal.name); else modal.ret = document.activeElement;
+    modal.name = name;
+    var back = $(MODALS[name]), body = back.querySelector('.help-body');
+    back.classList.remove('hidden'); document.documentElement.classList.add('help-open');
+    if (!modal.pushed){ try { history.pushState({ ivModal: 1 }, ''); modal.pushed = true; } catch(e){} }   // so the phone's Back button closes it
+    void back.offsetWidth; back.classList.add('open');
+    if (body) body.scrollTop = 0;
+    (focusEl || body).focus();                                     // so arrow keys / Page Down scroll the text
+    console.log('*** window open:', name);
+  }
+  function closeModal(fromPop){
+    var name = modal.name; if (!name) return;
+    if (name === 'wel'){ welcomeDone(); return; }                  // however the welcome is dismissed, Settings opens next
+    if (name === 'set' && modal.chainMic){ modal.chainMic = false; openMicCheck(); return; }   // first visit: then the mic check
+    if (name === 'mic') mcEnd();
+    hideModal(name); modal.name = null;
+    document.documentElement.classList.remove('help-open');
+    if (modal.ret && modal.ret.focus) modal.ret.focus();
+    if (modal.pushed && !fromPop){ modal.pushed = false; try { history.back(); } catch(e){} }
+    else modal.pushed = false;
+  }
+  function openHelp(){ $('helpVer').textContent = 'v' + APP_VERSION; openModal('help'); }
+  function closeHelp(){ closeModal(); }
+  function openSettings(){ openModal('set', $('voice').querySelector('.on') || undefined); }
+  function welcomeDone(){
+    settings.welcomed = true; save();
+    modal.chainMic = !settings.micChecked;
+    openSettings();
+    var vp = $('voice'); vp.classList.remove('pulse'); void vp.offsetWidth; vp.classList.add('pulse');
+    setTimeout(function(){ vp.classList.remove('pulse'); }, 3400);
+  }
+  /* --- Microphone check: hold an "ah"; measure how loud it arrives; set Boost to suit --- */
+  var MC_GAIN = 32, MC_TARGET = 0.05, MC_NEED = 1.5, MC_WAIT = 10;   // max boost while measuring; wanted level; seconds of clear note; give up after
+  var GAINS = [1, 2, 4, 8, 16, 32];
+  var mc = { on: false, raf: 0, t0: 0, last: 0, voiced: [], maxRaw: 0, state: 'idle', then: null, keep: false };
+  function showGain(){ $('micGain').value = String(settings.micGain); $('micGainNote').textContent = 'Boost now ×' + settings.micGain + (settings.micChecked ? '' : ' · not checked yet'); }
+  function mcSay(html, cls){ var m = $('mcMsg'); m.innerHTML = html; m.className = cls || ''; }
+  function mcButtons(go, alt){
+    $('mcGo').textContent = go; $('mcGo').disabled = go === 'Listening…';
+    $('mcAlt').textContent = alt; $('mcAlt').classList.toggle('hidden', !alt);
+  }
+  function mcIdle(){
+    mc.state = 'idle';
+    mcSay('<p class="lede">Let’s make sure Intervals can hear you. Tap <b>Start</b>' + (mic.analyser ? '' : ' and allow the microphone') +
+      ', then sing a comfortable <b>“ah”</b> and hold it for a few seconds — at the volume you’ll really practise at, from where you’ll really be.</p>');
+    $('mcFoot').innerHTML = 'Boost is ×' + settings.micGain + ' now. The check sets it for you. Headphones on? Keep them on — the check just listens.';
+    $('mcLevel').style.width = '0'; $('mcProg').style.width = '0'; $('mcNote').textContent = '–';
+    mcButtons('Start', mc.then ? 'Skip' : 'Close');
+  }
+  function openMicCheck(then){
+    if (started) stop();                                          // one thing at a time: the check needs the mic to itself
+    mc.then = then || null;
+    mcIdle();
+    openModal('mic', $('mcGo'));
+  }
+  function mcStart(){                                            // from the Start tap
+    ensureCtx();
+    mcButtons('Listening…', 'Cancel');
+    mcSay('<p class="lede">Opening the microphone…</p>');
+    ensureMic().then(function(){
+      if (modal.name !== 'mic') return;
+      mic.boost.gain.value = MC_GAIN;
+      mc.on = true; mc.state = 'listening'; mc.t0 = performance.now(); mc.voiced = []; mc.maxRaw = 0;
+      mcSay('<p class="lede">Sing <b>“ah”</b> and hold it…</p>');
+      $('mcFoot').textContent = 'The green bar fills while Intervals hears a clear note.';
+      idleStatus();
+      mc.raf = requestAnimationFrame(mcTick);
+      console.log('*** mic check: listening');
+    }).catch(function(err){
+      micError(err);
+      mc.state = 'error';
+      mcSay('<p class="big">The microphone didn’t start.</p><p>' + $('status').innerHTML + '</p>', 'bad');
+      mcButtons('Try again', mc.then ? 'Skip' : 'Close');
+    });
+  }
+  function mcTick(now){
+    if (!mc.on) return;
+    mc.raf = requestAnimationFrame(mcTick);
+    if (now - mc.last < 30) return;
+    mc.last = now;
+    readMic();
+    var p = detectPitch(mic.buf, audio.ctx.sampleRate, 60, 1300), raw = p.rms / MC_GAIN;
+    mc.maxRaw = Math.max(mc.maxRaw, raw);
+    $('mcLevel').style.width = Math.min(100, Math.sqrt(p.rms) * 250) + '%';
+    if (p.hz > 0 && p.clarity >= CLARITY){ mc.voiced.push(raw); $('mcNote').textContent = noteName(hzToMidi(p.hz)); }
+    else $('mcNote').textContent = '–';
+    var held = mc.voiced.length * 0.03;
+    $('mcProg').style.width = Math.min(100, held / MC_NEED * 100) + '%';
+    if (held >= MC_NEED) mcFinish();
+    else if (now - mc.t0 > MC_WAIT * 1000) mcFinish();
+  }
+  function mcStop(){ mc.on = false; cancelAnimationFrame(mc.raf); }
+  function mcFinish(){
+    mcStop();
+    var ok = mc.voiced.length * 0.03 >= MC_NEED;
+    if (ok){
+      var lvl = median(mc.voiced), g = GAINS[GAINS.length - 1];
+      for (var i = 0; i < GAINS.length; i++) if (lvl * GAINS[i] >= MC_TARGET){ g = GAINS[i]; break; }
+      var faint = lvl * MC_GAIN < MC_TARGET;                          // even the top boost is short of the target
+      settings.micGain = g; settings.micChecked = true; save(); showGain();
+      if (mic.boost) mic.boost.gain.value = g;
+      mc.state = 'done';
+      mcSay('<p class="big">✓ I can hear you' + (faint ? ', but only just.' : ' clearly.') + '</p><p>Boost is now <b>×' + g + '</b>' +
+        (g === 1 ? ' — you’re coming through loud and clear.' : g >= 16 ? ' — that suits a soft voice or a quiet microphone.' : '.') + '</p>' +
+        (faint ? '<p>Move the phone or tablet closer (about an arm’s length is good), or sing a little louder, and check again.</p>' : ''), faint ? 'bad' : 'ok');
+      $('mcFoot').textContent = 'You can check again any time from Settings, or with Check beside the Boost menu.';
+      mcButtons(mc.then ? 'Start practising' : 'Done', 'Check again');
+      console.log('*** mic check: level ' + lvl.toFixed(5) + ' -> boost x' + g);
+    } else {
+      mc.state = 'fail';
+      if (mc.maxRaw * MC_GAIN < 0.004)
+        mcSay('<p class="big">I can’t hear anything from the microphone.</p><ul>' +
+          '<li>Is it the right microphone? Unplugging a headset, or turning Bluetooth off, makes the device use its own.</li>' +
+          '<li>Check nothing is covering the microphone, and that no other app (a call, a voice recorder) is using it.</li>' +
+          '<li>On iPhone or iPad: Settings › Safari › Microphone must allow this site. On Android: tap the icon left of the web address › Permissions › Microphone.</li></ul>', 'bad');
+      else if (mc.voiced.length)
+        mcSay('<p class="big">Almost — hold the note a little longer.</p><p>I heard a clear note, but only for a moment. Sing one steady “ah” for three or four seconds.</p>', 'bad');
+      else
+        mcSay('<p class="big">I can hear sound, but not a clear note.</p><p>Sing one steady <b>“ah”</b> or <b>“oo”</b> — not speaking or humming — a little closer to the device. A quieter room helps too.</p>', 'bad');
+      $('mcFoot').textContent = '';
+      mcButtons('Try again', mc.then ? 'Skip' : 'Close');
+      console.log('*** mic check failed: max level ' + (mc.maxRaw * MC_GAIN).toFixed(4) + ', voiced frames ' + mc.voiced.length);
+    }
+  }
+  function mcEnd(){                                              // the window is closing: let go of the mic (a drill isn't running)
+    mcStop();
+    if (mic.boost) mic.boost.gain.value = settings.micGain;
+    if (!started && !mc.keep){ if (mic.analyser) stopMic(); releaseAudio(); idleStatus(); }
+    if (!mc.keep) mc.then = null;
+    $('mcLevel').style.width = '0';
+  }
+  function mcFinishWindow(){                                     // Done / Skip / Close
+    if (mc.state !== 'done'){ settings.micChecked = true; save(); showGain(); }   // skipped: don't keep asking
+    var then = mc.then;
+    mc.keep = !!then;                                             // going straight on to Start: keep the mic open (no second prompt)
+    closeModal(); mc.keep = false; mc.then = null;
+    if (then) then();
+  }
+  $('mcGo').addEventListener('click', function(){
+    if (mc.state === 'done') mcFinishWindow();
+    else mcStart();
+  });
+  $('mcAlt').addEventListener('click', function(){
+    if (mc.state === 'listening'){ mcStop(); mcIdle(); if (mic.boost) mic.boost.gain.value = settings.micGain; }
+    else if (mc.state === 'done') mcStart();
+    else mcFinishWindow();
+  });
+  $('mcClose').addEventListener('click', function(){ mc.then = null; closeModal(); });
+  $('mcOpen').addEventListener('click', function(){ openMicCheck(); });
+  $('mcOpen2').addEventListener('click', function(){ openMicCheck(); });
+
+  window.addEventListener('popstate', function(){ if (modal.pushed){ modal.pushed = false; closeModal(true); } });
+  $('helpBtn').addEventListener('click', openHelp);
+  $('helpClose').addEventListener('click', closeHelp);
+  $('setBtn').addEventListener('click', openSettings);
+  $('setClose').addEventListener('click', function(){ closeModal(); });
+  $('setDone').addEventListener('click', function(){ closeModal(); });
+  $('welOk').addEventListener('click', function(){ closeModal(); });
+  Object.keys(MODALS).forEach(function(k){                        // tap outside the window
+    $(MODALS[k]).addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+  });
+  $('helpBack').querySelector('.help-toc').addEventListener('click', function(e){      // section links scroll inside the window
+    var a = e.target.closest('a'); if (!a) return;
+    e.preventDefault();
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (el) $('helpBody').scrollTop = el.offsetTop - $('helpBody').offsetTop - 6;
+  });
+
+  var TAP_KEYS = ['1','2','3','4','5','6','7','8','9','0','-','='];
+  document.addEventListener('keydown', function(e){
+    if (helpIsOpen()){
+      if (e.key === 'Escape'){ e.preventDefault(); closeModal(); }
+      else if (e.key === 'Tab'){                                   // keep focus inside the open window
+        var f = $(MODALS[modal.name]).querySelectorAll('button, a[href], select, input, .help-body'), first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+      return;                                                      // no drill keys behind a window
+    }
+    if (tvMenuOpen() && e.key === 'Escape'){ e.preventDefault(); closeTvMenu(true); return; }
+    if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey){ e.preventDefault(); openHelp(); return; }
+    if (!started || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Escape'){ stopAndReport(); return; }
+    if (mode === 'tuner'){ if (e.key === ' '){ e.preventDefault(); playTarget(); } return; }
+    if (sf() && (e.key === 'k' || e.key === 'K')){ replayKey(); return; }
+    if (e.key === ' '){ e.preventDefault(); if (mode === 'tap') playQuestion(); else playReference(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); ask(); }
+    else if (singing() && (e.key === 'a' || e.key === 'A')) playAnswer();
+    else if (singing() && (e.key === 'r' || e.key === 'R') && phase === 'graded') retry();
+    else if (sf() && (e.key === 'k' || e.key === 'K')) replayKey();
+    else if (mode === 'tap' && TAP_KEYS.indexOf(e.key) >= 0){
+      var b = $('answers').querySelectorAll('button')[TAP_KEYS.indexOf(e.key)];
+      if (b) b.click();
+    }
+  });
+
+  /* =========================================================================
+   * THE LOOP: detect, show, grade (~30 times a second)
+   * ========================================================================= */
+  var loopOn = false, lastDetect = 0, needleCents = null;
+  /* running average of cents off, over the note being held (ignoring the scoop into it) */
+  var avgc = { frames: [], quietSince: null, shown: false };
+  function avgReset(){ avgc.frames = []; avgc.quietSince = null; avgc.shown = false; $('avgCents').className = 'avgc'; $('avgCents').innerHTML = sessionAvgHtml(); }
+  function sessionAvgHtml(){
+    var sum = 0, n = 0;
+    log.forEach(function(e){ if (e.t >= sessionStart && (e.m === 'sing' || e.m === 'solfa') && e.c != null && !e.h){ sum += e.c; n++; } });
+    if (!n || mode === 'tuner') return '';
+    var a = Math.round(sum / n);
+    return '<span class="sess">session: ' + (Math.abs(a) <= 5 ? 'on pitch on average' : Math.abs(a) + '¢ ' + (a > 0 ? 'sharp' : 'flat') + ' on average') + ' (' + n + ')</span>';
+  }
+  function avgFeed(t, cents){
+    var el = $('avgCents');
+    if (cents == null){
+      if (!avgc.frames.length) return;
+      if (avgc.quietSince == null) avgc.quietSince = t;
+      else if (t - avgc.quietSince > 0.35){ avgc.frames = []; avgc.quietSince = null; if (avgc.shown) el.classList.add('old'); }   // note over: keep it, dimmed
+      return;
+    }
+    avgc.quietSince = null;
+    if (avgc.frames.length && Math.abs(cents - avgc.frames[avgc.frames.length - 1].c) > 80) avgc.frames = [];   // jumped to another note
+    avgc.frames.push({ t: t, c: cents });
+    var body = avgc.frames.filter(function(f){ return f.t - avgc.frames[0].t >= ONSET; });
+    if (body.length < 3) return;
+    var a = Math.round(body.reduce(function(s, f){ return s + f.c; }, 0) / body.length);
+    el.className = 'avgc ' + (Math.abs(a) <= settings.tol ? 'ok' : 'bad');
+    el.innerHTML = 'avg <b>' + (Math.abs(a) <= 5 ? '±' + Math.abs(a) + '¢' : (a > 0 ? '+' : '−') + Math.abs(a) + '¢ ' + (a > 0 ? 'sharp' : 'flat')) + '</b>' + sessionAvgHtml();
+    avgc.shown = true;
+  }
+  function tick(ts){
+    requestAnimationFrame(tick);
+    if (ts - lastDetect < 30) return;
+    lastDetect = ts;
+    if (!mic.analyser || mode === 'tap'){ $('micState').textContent = mic.analyser ? 'on' : 'off'; return; }
+    var t = audio.ctx.currentTime;
+    readMic();
+    var v = VOICES[settings.voice] || VOICES.A;
+    var lo = mode === 'tuner' ? 60 : midiToHz(v.lo - 12), hi = mode === 'tuner' ? 1300 : midiToHz(v.hi + 12);
+    var p = detectPitch(mic.buf, audio.ctx.sampleRate, lo, hi);
+    $('level').style.width = Math.min(100, Math.sqrt(p.rms) * 250) + '%';
+
+    // watchdog: pure digital zeros for 4 s means the mic isn't really delivering
+    var anySignal = false;
+    for (var i = 0; i < mic.buf.length; i += 16){ if (mic.buf[i] !== 0){ anySignal = true; break; } }
+    if (anySignal) watch.lastSound = t;
+    if (audio.ctx.state === 'running' && !watch.warned && t - watch.lastSound > 4 && t - watch.since > 4){
+      watch.warned = true;
+      setStatus('The microphone is on but sending only silence. <button type="button" id="restartMic">Restart mic</button> If that doesn’t help, reload the page. <b>Name it</b> mode works without the mic.', true);
+    } else if (watch.warned && anySignal){ watch.warned = false; restoreStatus(); }
+
+    var voiced = p.hz > 0 && p.clarity >= CLARITY;
+    if (settings.diag){
+      var gaps = 0, zrun = 0;
+      for (var z = 0; z < mic.buf.length; z++){ if (mic.buf[z] === 0){ if (++zrun === 8) gaps++; } else zrun = 0; }
+      $('diag').textContent = audio.ctx.sampleRate + ' Hz · ' + audio.ctx.state + (navigator.audioSession ? ' · session ' + navigator.audioSession.type : IOS ? ' · unmute ' + (unmuteEl && !unmuteEl.paused ? 'on' : 'off') : '') + ' · boost ×' + settings.micGain + ' · level ' + p.rms.toFixed(4) +
+        ' · pitch ' + (p.hz ? p.hz.toFixed(1) + ' Hz' : '—') + ' · clarity ' + p.clarity.toFixed(2) + (voiced ? ' ✓' : '') +
+        ' · dropouts ' + gaps + (mic.analyser.getFloatTimeDomainData ? '' : ' · 8-bit');
+    }
+    if (audio.ctx.state !== 'running' && !ctxWasAsleep) checkCtxState();
+    $('micState').textContent = !anySignal ? 'silent' : voiced ? 'hearing you' : p.rms < 0.004 ? 'too quiet' : 'listening';
+    var midi = voiced ? hzToMidi(p.hz) : null;
+    var hearing = t >= listenFrom;     // while the piano sounds, the mic hears the piano
+
+    if (voiced && hearing){
+      if (sf()){ $('sungNote').textContent = solfa(midi); $('sungHz').textContent = spell(midi) + ' · ' + p.hz.toFixed(1) + ' Hz'; }
+      else { $('sungNote').textContent = noteName(midi); $('sungHz').textContent = p.hz.toFixed(1) + ' Hz'; }
+      var tt = mode === 'tuner' ? tunerTarget() : null;
+      var cents = (singing() && q) ? offTarget(midi) : tt != null ? (midi - tt) * 100 : (midi - Math.round(midi)) * 100;
+      if (mode === 'tuner') tunerText(midi, cents, tt);
+      needleCents = Math.max(-100, Math.min(100, cents));
+      $('needle').style.left = (50 + needleCents / 2) + '%';
+      $('needle').classList.remove('off');
+      trace.push({ t: t, midi: midi, ok: Math.abs(cents) <= settings.tol });
+      avgFeed(t, cents);
+    } else {
+      $('needle').classList.add('off');
+      if (!voiced) $('sungHz').innerHTML = '&nbsp;';
+      trace.push({ t: t, midi: null });
+      avgFeed(t, null);
+    }
+    if (mode === 'tuner') feedTuner(t, voiced && hearing ? midi : null);
+    if (singing()){
+      if (phase === 'prompting' && t >= listenFrom){ phase = 'listening'; updateButtons(); }
+      if (phase === 'listening') feedRun(t, voiced ? midi : null);
+    }
+    while (trace.length && trace[0].t < t - TRACE_SECS) trace.shift();
+    drawTrace(t);
+  }
+
+  /* --- Tuner attempts: a held note, from when you start until you stop (or jump elsewhere) --- */
+  var tun = { frames: [], quietSince: null, recent: [], fadeTimer: null };
+  function feedTuner(t, midi){
+    if (midi != null){
+      if (tun.frames.length){
+        var lastMed = median(tun.frames.slice(-8).map(function(f){ return f.midi; }));
+        if (Math.abs(midi - lastMed) * 100 > 100) finishAttempt();        // jumped to another note
+      }
+      tun.frames.push({ t: t, midi: midi }); tun.quietSince = null;
+    } else if (tun.frames.length){
+      if (tun.quietSince == null) tun.quietSince = t;
+      else if (t - tun.quietSince > 0.3) finishAttempt();
+    }
+  }
+  function finishAttempt(){
+    var fr = tun.frames; tun.frames = []; tun.quietSince = null;
+    if (fr.length < 4) return;
+    var body = fr.filter(function(f){ return f.t - fr[0].t >= ONSET; });
+    var dur = fr[fr.length - 1].t - fr[0].t;
+    if (body.length < 4 || dur < 0.35) return;                             // a blip, not a note
+    var mids = body.map(function(f){ return f.midi; }), med = median(mids);
+    var tt = tunerTarget(), ref = tt != null ? tt : Math.round(med);
+    var cs = mids.map(function(m){ return (m - ref) * 100; });
+    var mean = cs.reduce(function(a, b){ return a + b; }, 0) / cs.length;
+    var sd = Math.sqrt(cs.reduce(function(a, c){ return a + (c - mean) * (c - mean); }, 0) / cs.length);
+    var inTune = Math.round(100 * cs.filter(function(c){ return Math.abs(c) <= settings.tol; }).length / cs.length);
+    var semis = Math.round(med - ref), m = Math.round(mean);
+    var ok = semis === 0 && Math.abs(mean) <= settings.tol;
+    var how = Math.abs(m) <= 5 ? 'right on pitch' : 'average ' + Math.abs(m) + '¢ ' + (m > 0 ? 'sharp' : 'flat');
+    var big, det;
+    if (semis === 0){
+      big = (ok ? '✓ ' : '') + noteName(ref) + ' held ' + dur.toFixed(1) + ' s';
+      det = how + ' · wavered ±' + Math.round(sd) + '¢ · in tune ' + inTune + '% of the time';
+    } else {
+      big = noteName(med) + ' held ' + dur.toFixed(1) + ' s';
+      det = (Math.abs(semis) % 12 === 0 ? Math.abs(semis / 12) + ' octave' + (Math.abs(semis) > 12 ? 's' : '') : intervalName(semis)) +
+            (semis > 0 ? ' above ' : ' below ') + noteName(ref) + ' · wavered ±' + Math.round(sd) + '¢';
+    }
+    var box = $('tunerSum');
+    box.className = 'tsum ' + (ok ? 'ok' : 'bad');
+    box.innerHTML = '<div class="big">' + big + '</div><div class="det">' + det + '</div>';
+    void box.offsetWidth; box.classList.add('go');
+    clearTimeout(tun.fadeTimer);
+    tun.fadeTimer = setTimeout(function(){ box.classList.add('fade'); }, 5000);
+    tun.recent.push({ ok: ok, txt: noteName(med) + ' ' + (semis === 0 ? (m > 0 ? '+' : m < 0 ? '−' : '±') + Math.abs(m) + '¢' : '✗') });
+    if (tun.recent.length > 8) tun.recent.shift();
+    var chips = $('tunerRecent'); chips.classList.remove('hidden');
+    chips.innerHTML = tun.recent.map(function(r){ return '<span' + (r.ok ? ' class="ok"' : '') + '>' + r.txt + '</span>'; }).join('');
+  }
+  function clearTuner(){
+    tun.frames = []; tun.quietSince = null; tun.recent = []; clearTimeout(tun.fadeTimer);
+    $('tunerSum').className = 'tsum hidden'; $('tunerSum').innerHTML = '';
+    $('tunerRecent').classList.add('hidden'); $('tunerRecent').innerHTML = '';
+  }
+
+  function tunerText(midi, cents, tt){
+    var c = Math.round(cents), res = $('result'), off = Math.abs(c) <= settings.tol;
+    var how = Math.abs(c) <= 5 ? 'right on' : Math.abs(c) + '¢ ' + (c > 0 ? 'sharp' : 'flat');
+    if (tt == null){ res.className = 'result' + (off ? ' ok' : ''); res.innerHTML = noteName(midi) + ' · ' + how; return; }
+    var semis = Math.round(midi - tt);
+    if (semis === 0){ res.className = 'result ' + (off ? 'ok' : 'bad'); res.innerHTML = (off ? '✓ ' : '') + noteName(tt) + ' · ' + how; }
+    else {
+      res.className = 'result bad';
+      res.innerHTML = 'You’re on ' + noteName(midi) + ' — ' + (Math.abs(semis) % 12 === 0 ? Math.abs(semis / 12) + ' octave' + (Math.abs(semis) > 12 ? 's' : '') : intervalName(semis))
+        + (semis > 0 ? ' above ' : ' below ') + noteName(tt);
+    }
+  }
+
+  /* --- the pitch trace --- */
+  function drawBand(){
+    var band = $('band');
+    var w = Math.min(100, settings.tol) / 2;
+    band.style.left = (50 - w) + '%'; band.style.width = (2 * w) + '%';
+  }
+  function drawTrace(now){
+    var cv = $('trace'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H);
+    var pts = trace.filter(function(p){ return p.midi != null; });
+    var center, span, drill = singing() && q, tt = mode === 'tuner' ? tunerTarget() : null;
+    if (drill){ center = (q.ref + q.target) / 2; span = Math.max(Math.abs(q.semi) + 5, 10); }
+    else if (tt != null){ center = tt; span = 12; }
+    else { center = pts.length ? Math.round(median(pts.slice(-30).map(function(p){ return p.midi; }))) : 64; span = 12; }
+    var lo = center - span / 2 - 0.7, hi = center + span / 2 + 0.7;
+    function y(m){ return H - (m - lo) / (hi - lo) * H; }
+    function x(t){ return W - (now - t) / TRACE_SECS * W; }
+    g.font = '22px ' + getComputedStyle(document.body).fontFamily;
+    for (var m = Math.ceil(lo); m <= Math.floor(hi); m++){
+      g.strokeStyle = (m % 12 === 0) ? '#4a4455' : '#312d3a'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, y(m)); g.lineTo(W, y(m)); g.stroke();
+      g.fillStyle = sf() && isDiatonic(m) ? '#a79fb5' : '#6d6680';
+      g.fillText(sf() ? (isDiatonic(m) || settings.solfaChrom ? solfa(m) + '  ' : '') + spell(m) : noteName(m), 8, y(m) - 4);
+    }
+    if (drill){
+      var tolS = settings.tol / 100;
+      var targets = [q.target];
+      if (settings.anyOct){ for (var o = -24; o <= 24; o += 12) if (o && q.target + o > lo - 1 && q.target + o < hi + 1) targets.push(q.target + o); }
+      targets.forEach(function(tm, k){
+        g.fillStyle = k ? 'rgba(111,220,140,0.10)' : 'rgba(111,220,140,0.22)';
+        g.fillRect(0, y(tm + tolS), W, y(tm - tolS) - y(tm + tolS));
+        g.strokeStyle = '#6fdc8c'; g.lineWidth = k ? 1 : 2; g.beginPath(); g.moveTo(0, y(tm)); g.lineTo(W, y(tm)); g.stroke();
+      });
+      g.strokeStyle = '#9d7bff'; g.setLineDash([10, 8]); g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, y(q.ref)); g.lineTo(W, y(q.ref)); g.stroke(); g.setLineDash([]);
+      g.textAlign = 'right';
+      g.fillStyle = '#6fdc8c'; g.fillText('target ' + lbl(q.target), W - 12, y(q.target) - 8);
+      g.fillStyle = '#9d7bff'; g.fillText('reference ' + lbl(q.ref), W - 12, y(q.ref) + 26);
+      g.textAlign = 'left';
+    }
+    if (tt != null){
+      var tS = settings.tol / 100;
+      g.fillStyle = 'rgba(111,220,140,0.22)'; g.fillRect(0, y(tt + tS), W, y(tt - tS) - y(tt + tS));
+      g.strokeStyle = '#6fdc8c'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, y(tt)); g.lineTo(W, y(tt)); g.stroke();
+      g.fillStyle = '#6fdc8c'; g.fillText('target ' + noteName(tt), W - 170, y(tt) - 8);
+    }
+    for (var i = 1; i < trace.length; i++){
+      var a = trace[i - 1], b = trace[i];
+      if (a.midi == null || b.midi == null || Math.abs(a.midi - b.midi) > 1.5) continue;
+      g.strokeStyle = b.ok ? '#6fdc8c' : '#4fe0e6'; g.lineWidth = 5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x(a.t), y(a.midi)); g.lineTo(x(b.t), y(b.midi)); g.stroke();
+    }
+  }
+
+  showGain();
+  $('micGain').addEventListener('change', function(){
+    settings.micGain = +$('micGain').value; save(); showGain();
+    if (mic.boost) mic.boost.gain.value = settings.micGain;
+  });
+  buildSetup(); buildTunerPick(); buildKeyPick(); $('diag').classList.toggle('hidden', !settings.diag);
+  drawBand(); renderStats(); setMode(mode); drawTrace(0);
+  if (firstRun) setTimeout(function(){ openModal('wel', $('welOk')); }, 350);
+
+  // test hook (read by the Node tests; harmless in the page)
+  window.__intervals = { detectPitch: detectPitch, hzToMidi: hzToMidi, noteName: noteName, intervalName: intervalName, aIntervalName: aIntervalName, intervalShort: intervalShort,
+    drawStaff: drawStaff, rangeStaff: rangeStaff, staffPos: staffPos, keyAcc: keyAcc, newQuestion: newQuestion, newSolfaQuestion: newSolfaQuestion, spell: spell, solfa: solfa, settings: settings, VOICES: VOICES, median: median, log: function(){ return log; }, renderStats: renderStats, q: function(){ return q; }, ivSpell: ivSpell };
+})();
+</script>
+<script>
+/* =========================================================================
+ * OFFLINE / HOME-SCREEN APP (0.19) -- registers sw.js (beside this file). Only over https or
+ * localhost; opened as a file it simply doesn't, and everything else works as before.
+ * ========================================================================= */
+(function(){
+  if (!('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
+  var here = location.href.split(/[?#]/)[0];
+  if (/\/$/.test(here)) here += 'index.html';   // GitHub Pages: the bare folder is cached as index.html
+  function controlled(){
+    if (navigator.serviceWorker.controller) return Promise.resolve();
+    return new Promise(function(res){
+      navigator.serviceWorker.addEventListener('controllerchange', res, { once: true });
+      setTimeout(res, 3000);
+    });
+  }
+  function showReady(){
+    if (!window.caches) return;
+    Promise.all([caches.match(here), caches.match('intervals-piano-samples.json')]).then(function(hits){
+      var ok = !!(hits[0] && hits[1]);
+      document.getElementById('offTag').hidden = !ok;
+      console.log('*** offline ready: ' + ok);
+    }).catch(function(){});
+  }
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      console.log('*** service worker registered, scope ' + reg.scope);
+      return navigator.serviceWorker.ready;
+    }).then(controlled).then(function(){
+      // make sure this very file is cached (it is, if current.txt names it; this covers opening a version directly)
+      return fetch(here).catch(function(){});
+    }).then(showReady).catch(function(e){ console.log('*** service worker not available', e); });
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){});
+  });
+})();
+</script>
+</body>
+</html>
